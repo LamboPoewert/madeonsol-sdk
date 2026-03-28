@@ -1,7 +1,7 @@
 {
   "name": "madeonsol",
-  "version": "1.0.0",
-  "description": "Official SDK for the MadeOnSol Solana API \u00e2\u20ac\u201d KOL wallet tracking, Pump.fun deployer intelligence, and tool directory",
+  "version": "1.0.1",
+  "description": "Official SDK for the MadeOnSol Solana API â€” KOL wallet tracking, Pump.fun deployer intelligence, and tool directory",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
