@@ -1,9 +1,14 @@
 # madeonsol
 
 [![npm version](https://img.shields.io/npm/v/madeonsol?style=flat-square)](https://www.npmjs.com/package/madeonsol)
+[![npm downloads](https://img.shields.io/npm/dm/madeonsol?style=flat-square)](https://www.npmjs.com/package/madeonsol)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4+-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-Official TypeScript/JavaScript SDK for the **MadeOnSol Solana API** — zero dependencies, fully typed, works in Node.js ≥ 18 and edge runtimes.
+Official TypeScript/JavaScript SDK for the **[MadeOnSol](https://madeonsol.com) Solana API** — zero dependencies, fully typed, works in Node.js ≥ 18 and edge runtimes.
+
+> **Build Solana trading bots, analytics dashboards, KOL copy-trading tools, deployer sniper bots, and ecosystem browsers.**
 
 | Feature | Description |
 |---|---|
@@ -11,7 +16,7 @@ Official TypeScript/JavaScript SDK for the **MadeOnSol Solana API** — zero dep
 | **Deployer Hunter** | Pump.fun deployer scoring, tier leaderboard, deploy alerts, and bonding intelligence |
 | **Tool Directory** | Search 950+ Solana tools and dApps indexed on MadeOnSol |
 
-**Links:** [Full docs](https://madeonsol.com/api-docs) · [Website](https://madeonsol.com) · [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api)
+**Links:** [Full API docs](https://madeonsol.com/solana-api) · [Website](https://madeonsol.com) · [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api)
 
 ---
 
@@ -51,6 +56,17 @@ const { tools } = await client.tools.search({ q: "trading", limit: 10 });
 ```
 
 Get your API key at [RapidAPI](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api).
+
+---
+
+## Use cases
+
+- **Copy-trading bot** — stream KOL buys via `client.kol.feed()` and mirror trades
+- **Deployer sniper** — monitor `client.deployer.alerts()` for elite-tier launches
+- **Coordination detector** — flag tokens with `client.kol.coordination({ min_kols: 3 })`
+- **Analytics dashboard** — combine leaderboard, PnL, and tool data
+- **Telegram/Discord bot** — pipe alerts into chat with formatted messages
+- **Portfolio tracker** — use `client.kol.wallet()` to follow specific KOL positions
 
 ---
 
@@ -344,6 +360,15 @@ import type {
   BestTokensPeriod,
 } from "madeonsol";
 ```
+
+---
+
+## Related
+
+- [MadeOnSol website](https://madeonsol.com) — Browse 950+ Solana tools
+- [API documentation](https://madeonsol.com/solana-api) — Interactive endpoint reference
+- [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api) — Subscribe and get your API key
+- [MadeOnSol on GitHub](https://github.com/LamboPoewert/madeonsol) — Main project repository
 
 ---
 

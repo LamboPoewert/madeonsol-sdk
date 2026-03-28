@@ -1,0 +1,60 @@
+# MadeOnSol SDK
+
+> Official TypeScript/JavaScript SDK for the MadeOnSol Solana API
+
+## What is MadeOnSol?
+
+MadeOnSol (https://madeonsol.com) is the largest Solana ecosystem tool directory with 950+ indexed tools and dApps. The API provides programmatic access to:
+
+- **KOL Tracker**: Real-time trade feed for 463+ tracked Solana KOL (Key Opinion Leader) wallets, PnL leaderboards, coordination detection, and per-wallet profiles.
+- **Deployer Hunter**: Pump.fun deployer wallet scoring, tier-based leaderboards, deploy alerts, and bonding curve intelligence.
+- **Tool Directory**: Search and browse 950+ Solana tools and dApps.
+
+## Installation
+
+```
+npm install madeonsol
+```
+
+## Authentication
+
+Get your API key at: https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+
+```typescript
+import { MadeOnSol } from "madeonsol";
+const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
+```
+
+## Available Methods
+
+### KOL Tracker (client.kol)
+- `client.kol.feed(params?)` - Live KOL trade feed (buy/sell, filter by wallet)
+- `client.kol.leaderboard(params?)` - PnL leaderboard (today, 7d, 30d)
+- `client.kol.wallet(wallet, params?)` - Single KOL wallet profile + PnL breakdown
+- `client.kol.coordination(params?)` - Detect coordinated KOL buying (pump signals)
+- `client.kol.token(mint)` - KOL activity for a specific token
+
+### Deployer Hunter (client.deployer)
+- `client.deployer.stats()` - Global deployer statistics
+- `client.deployer.leaderboard(params?)` - Deployers ranked by bonding rate
+- `client.deployer.profile(wallet)` - Single deployer profile
+- `client.deployer.tokens(wallet, params?)` - Tokens deployed by a wallet
+- `client.deployer.alerts(params?)` - Real-time deploy alerts
+- `client.deployer.alertStats(params?)` - Alert statistics by tier
+- `client.deployer.bestTokens(params?)` - Top tokens by peak market cap
+- `client.deployer.recentBonds(params?)` - Recently bonded tokens
+
+### Tool Directory (client.tools)
+- `client.tools.search(params?)` - Search 950+ Solana tools (full-text + category filter)
+
+## Error Handling
+
+All methods throw `MadeOnSolError` with `.message`, `.status`, and `.body` properties.
+
+## Links
+
+- Documentation: https://madeonsol.com/solana-api
+- Website: https://madeonsol.com
+- RapidAPI: https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+- GitHub: https://github.com/LamboPoewert/madeonsol-sdk
+- npm: https://www.npmjs.com/package/madeonsol
