@@ -1,0 +1,57 @@
+{
+  "name": "madeonsol",
+  "version": "1.0.0",
+  "description": "Official SDK for the MadeOnSol Solana API — KOL wallet tracking, Pump.fun deployer intelligence, and tool directory",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "solana",
+    "api",
+    "sdk",
+    "kol",
+    "kol-tracker",
+    "trading",
+    "pump.fun",
+    "pumpfun",
+    "deployer",
+    "deployer-hunter",
+    "wallet-tracking",
+    "defi",
+    "web3",
+    "blockchain",
+    "solana-tools",
+    "token",
+    "madeonsol",
+    "rapidapi",
+    "bonding-curve",
+    "smart-money"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LamboPoewert/madeonsol-sdk.git"
+  },
+  "homepage": "https://madeonsol.com/solana-api",
+  "bugs": {
+    "url": "https://github.com/LamboPoewert/madeonsol-sdk/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
