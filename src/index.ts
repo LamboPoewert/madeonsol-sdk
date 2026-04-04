@@ -327,6 +327,46 @@ export interface ToolsSearchResponse {
   count: number;
 }
 
+// ─── Streaming types ────────────────────────────────────────────────────────
+
+export interface StreamToken {
+  token: string;
+  expires_at: string;
+  ws_url: string;
+  /** DEX trade stream URL — only present for Ultra tier subscribers */
+  dex_ws_url?: string;
+  usage: string;
+}
+
+// ─── Webhook types ──────────────────────────────────────────────────────────
+
+export interface WebhookCreateParams {
+  url: string;
+  events: string[];
+  filters?: Record<string, unknown>;
+}
+
+export interface WebhookUpdateParams {
+  url?: string;
+  events?: string[];
+  filters?: Record<string, unknown>;
+  status?: "active" | "paused";
+}
+
+export interface Webhook {
+  id: number;
+  url: string;
+  events: string[];
+  filters: Record<string, unknown> | null;
+  status: string;
+  created_at: string;
+}
+
+export interface WebhookListResponse {
+  webhooks: Webhook[];
+  count: number;
+}
+
 // ─── Client config ────────────────────────────────────────────────────────────
 
 export interface MadeOnSolConfig {
@@ -482,6 +522,57 @@ class ToolsClient {
   }
 }
 
+// ─── Stream namespace ───────────────────────────────────────────────────────
+
+class StreamClient {
+  constructor(private readonly _post: <T>(url: string) => Promise<T>) {}
+
+  /**
+   * Generate a 24-hour WebSocket streaming token.
+   * Pro/Ultra: ws_url for KOL/deployer event streaming.
+   * Ultra only: dex_ws_url for all-DEX trade streaming.
+   */
+  getToken(): Promise<StreamToken> {
+    return this._post(buildUrl("/stream/token"));
+  }
+}
+
+// ─── Webhook namespace ──────────────────────────────────────────────────────
+
+class WebhookClient {
+  constructor(
+    private readonly _get: <T>(url: string) => Promise<T>,
+    private readonly _post: <T>(url: string, body?: unknown) => Promise<T>,
+    private readonly _patch: <T>(url: string, body?: unknown) => Promise<T>,
+    private readonly _delete: <T>(url: string) => Promise<T>,
+  ) {}
+
+  /** List all webhooks. */
+  list(): Promise<WebhookListResponse> {
+    return this._get(buildUrl("/webhooks"));
+  }
+
+  /** Create a new webhook. */
+  create(params: WebhookCreateParams): Promise<Webhook> {
+    return this._post(buildUrl("/webhooks"), params);
+  }
+
+  /** Update a webhook. */
+  update(id: number, params: WebhookUpdateParams): Promise<Webhook> {
+    return this._patch(buildUrl(`/webhooks/${id}`), params);
+  }
+
+  /** Delete a webhook. */
+  delete(id: number): Promise<{ success: boolean }> {
+    return this._delete(buildUrl(`/webhooks/${id}`));
+  }
+
+  /** Send a test payload to a webhook. */
+  test(webhookId: number): Promise<unknown> {
+    return this._post(buildUrl("/webhooks/test"), { webhook_id: webhookId });
+  }
+}
+
 // ─── Main client ─────────────────────────────────────────────────────────────
 
 /**
@@ -505,6 +596,10 @@ export class MadeOnSol {
   readonly deployer: DeployerClient;
   /** Solana tool directory endpoints. */
   readonly tools: ToolsClient;
+  /** WebSocket streaming token (Pro/Ultra). */
+  readonly stream: StreamClient;
+  /** Webhook management (Pro/Ultra). */
+  readonly webhooks: WebhookClient;
 
   private readonly _apiKey: string;
 
@@ -514,42 +609,52 @@ export class MadeOnSol {
     }
     this._apiKey = config.apiKey;
 
-    const bound = this._request.bind(this);
-    this.kol = new KolClient(bound);
-    this.deployer = new DeployerClient(bound);
-    this.tools = new ToolsClient(bound);
+    const get = <T>(url: string) => this._request<T>("GET", url);
+    const post = <T>(url: string, body?: unknown) => this._request<T>("POST", url, body);
+    const patch = <T>(url: string, body?: unknown) => this._request<T>("PATCH", url, body);
+    const del = <T>(url: string) => this._request<T>("DELETE", url);
+
+    this.kol = new KolClient(get);
+    this.deployer = new DeployerClient(get);
+    this.tools = new ToolsClient(get);
+    this.stream = new StreamClient(post);
+    this.webhooks = new WebhookClient(get, post, patch, del);
   }
 
-  private async _request<T>(url: string): Promise<T> {
-    const response = await fetch(url, {
-      method: "GET",
+  private async _request<T>(method: string, url: string, body?: unknown): Promise<T> {
+    const options: RequestInit = {
+      method,
       headers: {
         "X-RapidAPI-Key": this._apiKey,
         "X-RapidAPI-Host": RAPIDAPI_HOST,
         "Accept": "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
       },
-    });
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    };
 
-    let body: unknown;
+    const response = await fetch(url, options);
+
+    let responseBody: unknown;
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
-      body = await response.json();
+      responseBody = await response.json();
     } else {
-      body = await response.text();
+      responseBody = await response.text();
     }
 
     if (!response.ok) {
       const message =
-        typeof body === "object" &&
-        body !== null &&
-        "message" in body &&
-        typeof (body as Record<string, unknown>).message === "string"
-          ? (body as Record<string, string>).message
+        typeof responseBody === "object" &&
+        responseBody !== null &&
+        "message" in responseBody &&
+        typeof (responseBody as Record<string, unknown>).message === "string"
+          ? (responseBody as Record<string, string>).message
           : `Request failed with status ${response.status}`;
-      throw new MadeOnSolError(message, response.status, body);
+      throw new MadeOnSolError(message, response.status, responseBody);
     }
 
-    return body as T;
+    return responseBody as T;
   }
 }
 

@@ -6,8 +6,10 @@
 
 MadeOnSol (https://madeonsol.com) is the largest Solana ecosystem tool directory with 950+ indexed tools and dApps. The API provides programmatic access to:
 
-- **KOL Tracker**: Real-time trade feed for 463+ tracked Solana KOL (Key Opinion Leader) wallets, PnL leaderboards, coordination detection, and per-wallet profiles.
+- **KOL Tracker**: Real-time trade feed for 946 tracked Solana KOL (Key Opinion Leader) wallets, PnL leaderboards, coordination detection, and per-wallet profiles.
 - **Deployer Hunter**: Pump.fun deployer wallet scoring, tier-based leaderboards, deploy alerts, and bonding curve intelligence.
+- **DEX Trade Stream**: Real-time WebSocket stream of ALL Solana DEX trades across 9 programs (Ultra only). Filter by token, wallet, program, trade size, or direction.
+- **Webhooks**: Push notifications for KOL trades, deployer alerts, and coordination signals (Pro/Ultra).
 - **Tool Directory**: Search and browse 950+ Solana tools and dApps.
 
 ## Installation
@@ -46,6 +48,16 @@ const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
 
 ### Tool Directory (client.tools)
 - `client.tools.search(params?)` - Search 950+ Solana tools (full-text + category filter)
+
+### WebSocket Streaming (client.stream) — Pro/Ultra
+- `client.stream.getToken()` - Get 24h WebSocket token. Returns ws_url (KOL/deployer events) and dex_ws_url (all-DEX trades, Ultra only)
+
+### Webhooks (client.webhooks) — Pro/Ultra
+- `client.webhooks.list()` - List all webhooks
+- `client.webhooks.create(params)` - Create webhook (url, events, filters)
+- `client.webhooks.update(id, params)` - Update webhook
+- `client.webhooks.delete(id)` - Delete webhook
+- `client.webhooks.test(id)` - Send test payload
 
 ## Error Handling
 

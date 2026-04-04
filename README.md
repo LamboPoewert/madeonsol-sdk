@@ -12,8 +12,10 @@ Official TypeScript/JavaScript SDK for the **[MadeOnSol](https://madeonsol.com) 
 
 | Feature | Description |
 |---|---|
-| **KOL Tracker** | Real-time trade feed, PnL leaderboard, coordination detection, and per-wallet profiles for 463 tracked KOL wallets |
+| **KOL Tracker** | Real-time trade feed, PnL leaderboard, coordination detection, and per-wallet profiles for 946 tracked KOL wallets |
 | **Deployer Hunter** | Pump.fun deployer scoring, tier leaderboard, deploy alerts, and bonding intelligence |
+| **DEX Trade Stream** | Real-time WebSocket stream of ALL Solana DEX trades — filter by token, wallet, program, or trade size (Ultra) |
+| **Webhooks** | Push notifications for KOL trades, coordination signals, and deployer alerts (Pro/Ultra) |
 | **Tool Directory** | Search 950+ Solana tools and dApps indexed on MadeOnSol |
 
 **Links:** [Full API docs](https://madeonsol.com/solana-api) · [Website](https://madeonsol.com) · [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api)
@@ -62,10 +64,11 @@ Get your API key at [RapidAPI](https://rapidapi.com/ClaudeTools/api/madeonsol-so
 ## Use cases
 
 - **Copy-trading bot** — stream KOL buys via `client.kol.feed()` and mirror trades
+- **DEX trade sniping** — subscribe to the all-DEX stream filtered by token or wallet
 - **Deployer sniper** — monitor `client.deployer.alerts()` for elite-tier launches
 - **Coordination detector** — flag tokens with `client.kol.coordination({ min_kols: 3 })`
 - **Analytics dashboard** — combine leaderboard, PnL, and tool data
-- **Telegram/Discord bot** — pipe alerts into chat with formatted messages
+- **Telegram/Discord bot** — pipe alerts via webhooks into chat
 - **Portfolio tracker** — use `client.kol.wallet()` to follow specific KOL positions
 
 ---
@@ -280,6 +283,53 @@ Returns: `ToolsSearchResponse`
 
 ---
 
+### WebSocket Streaming — `client.stream`
+
+#### `client.stream.getToken()`
+
+Generate a 24-hour WebSocket streaming token. Pro/Ultra subscribers get `ws_url` for KOL/deployer event streaming. Ultra subscribers also get `dex_ws_url` for the all-DEX trade stream.
+
+```ts
+const token = await client.stream.getToken();
+console.log(token.ws_url);      // wss://madeonsol.com/ws/v1/stream
+console.log(token.dex_ws_url);  // wss://madeonsol.com/ws/v1/dex-stream (Ultra only)
+```
+
+Returns: `StreamToken` — `{ token, expires_at, ws_url, dex_ws_url?, usage }`
+
+**DEX Trade Stream (Ultra):** Connect to `dex_ws_url` and subscribe with filters:
+
+```ts
+ws.send(JSON.stringify({
+  type: "subscribe",
+  filters: { program: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", min_sol: 0.5 }
+}));
+// Filters: token_mint, token_mints (max 50), wallet, wallets (max 50), program, min_sol, max_sol, action
+```
+
+---
+
+### Webhooks — `client.webhooks`
+
+Manage push notification webhooks for real-time events (Pro: 3, Ultra: 10).
+
+```ts
+// Create a webhook
+const webhook = await client.webhooks.create({
+  url: "https://example.com/hook",
+  events: ["kol:trade", "deployer:alert"],
+  filters: { min_sol: 1 },
+});
+
+// List, update, delete
+const { webhooks } = await client.webhooks.list();
+await client.webhooks.update(webhook.id, { status: "paused" });
+await client.webhooks.delete(webhook.id);
+await client.webhooks.test(webhook.id);
+```
+
+---
+
 ## Error handling
 
 All methods throw `MadeOnSolError` on non-2xx responses.
@@ -349,6 +399,15 @@ import type {
   ToolsSearchParams,
   ToolsSearchResponse,
   Tool,
+
+  // Streaming
+  StreamToken,
+
+  // Webhooks
+  Webhook,
+  WebhookCreateParams,
+  WebhookUpdateParams,
+  WebhookListResponse,
 
   // Enums / unions
   KolAction,
