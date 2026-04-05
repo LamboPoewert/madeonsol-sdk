@@ -532,7 +532,7 @@ class ToolsClient {
 // ─── Stream namespace ───────────────────────────────────────────────────────
 
 class StreamClient {
-  constructor(private readonly _post: <T>(url: string) => Promise<T>) {}
+  constructor(private readonly _post: <T>(url: string) => Promise<T>, private readonly _baseUrl: string) {}
 
   /**
    * Generate a 24-hour WebSocket streaming token.
@@ -540,7 +540,7 @@ class StreamClient {
    * Ultra only: dex_ws_url for all-DEX trade streaming.
    */
   getToken(): Promise<StreamToken> {
-    return this._post(buildUrl("/stream/token"));
+    return this._post(buildUrl(this._baseUrl, "/stream/token"));
   }
 }
 
@@ -552,31 +552,32 @@ class WebhookClient {
     private readonly _post: <T>(url: string, body?: unknown) => Promise<T>,
     private readonly _patch: <T>(url: string, body?: unknown) => Promise<T>,
     private readonly _delete: <T>(url: string) => Promise<T>,
+    private readonly _baseUrl: string,
   ) {}
 
   /** List all webhooks. */
   list(): Promise<WebhookListResponse> {
-    return this._get(buildUrl("/webhooks"));
+    return this._get(buildUrl(this._baseUrl, "/webhooks"));
   }
 
   /** Create a new webhook. */
   create(params: WebhookCreateParams): Promise<Webhook> {
-    return this._post(buildUrl("/webhooks"), params);
+    return this._post(buildUrl(this._baseUrl, "/webhooks"), params);
   }
 
   /** Update a webhook. */
   update(id: number, params: WebhookUpdateParams): Promise<Webhook> {
-    return this._patch(buildUrl(`/webhooks/${id}`), params);
+    return this._patch(buildUrl(this._baseUrl, `/webhooks/${id}`), params);
   }
 
   /** Delete a webhook. */
   delete(id: number): Promise<{ success: boolean }> {
-    return this._delete(buildUrl(`/webhooks/${id}`));
+    return this._delete(buildUrl(this._baseUrl, `/webhooks/${id}`));
   }
 
   /** Send a test payload to a webhook. */
   test(webhookId: number): Promise<unknown> {
-    return this._post(buildUrl("/webhooks/test"), { webhook_id: webhookId });
+    return this._post(buildUrl(this._baseUrl, "/webhooks/test"), { webhook_id: webhookId });
   }
 }
 
@@ -628,28 +629,39 @@ export class MadeOnSol {
     this._isDirect = config.apiKey.startsWith("msk_");
     this._baseUrl = this._isDirect ? DIRECT_BASE_URL : RAPIDAPI_BASE_URL;
 
-    const bound = this._request.bind(this);
-    this.kol = new KolClient(bound, this._baseUrl);
-    this.deployer = new DeployerClient(bound, this._baseUrl);
-    this.tools = new ToolsClient(bound, this._baseUrl);
+    const boundGet = this._request.bind(this);
+    const boundPost = ((url: string, body?: unknown) => this._requestWithBody("POST", url, body)) as <T>(url: string, body?: unknown) => Promise<T>;
+    const boundPatch = ((url: string, body?: unknown) => this._requestWithBody("PATCH", url, body)) as <T>(url: string, body?: unknown) => Promise<T>;
+    const boundDelete = ((url: string) => this._requestWithBody("DELETE", url)) as <T>(url: string) => Promise<T>;
+
+    this.kol = new KolClient(boundGet, this._baseUrl);
+    this.deployer = new DeployerClient(boundGet, this._baseUrl);
+    this.tools = new ToolsClient(boundGet, this._baseUrl);
+    this.stream = new StreamClient(boundPost, this._baseUrl);
+    this.webhooks = new WebhookClient(boundGet, boundPost, boundPatch, boundDelete, this._baseUrl);
+  }
+
+  private _headers(): Record<string, string> {
+    return this._isDirect
+      ? { Authorization: `Bearer ${this._apiKey}`, Accept: "application/json" }
+      : { "X-RapidAPI-Key": this._apiKey, "X-RapidAPI-Host": RAPIDAPI_HOST, Accept: "application/json" };
   }
 
   private async _request<T>(url: string): Promise<T> {
-    const headers: Record<string, string> = this._isDirect
-      ? {
-          Authorization: `Bearer ${this._apiKey}`,
-          Accept: "application/json",
-        }
-      : {
-          "X-RapidAPI-Key": this._apiKey,
-          "X-RapidAPI-Host": RAPIDAPI_HOST,
-          Accept: "application/json",
-        };
+    const response = await fetch(url, { method: "GET", headers: this._headers() });
+    return this._handleResponse<T>(response);
+  }
 
-    const response = await fetch(url, { method: "GET", headers });
+  private async _requestWithBody<T>(method: string, url: string, body?: unknown): Promise<T> {
+    const response = await fetch(url, {
+      method,
+      headers: { ...this._headers(), "Content-Type": "application/json" },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return this._handleResponse<T>(response);
+  }
 
-    const response = await fetch(url, options);
-
+  private async _handleResponse<T>(response: Response): Promise<T> {
     let responseBody: unknown;
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
