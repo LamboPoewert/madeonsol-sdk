@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // MadeOnSol SDK
-// Official TypeScript wrapper for the MadeOnSol Solana API on RapidAPI.
+// Official TypeScript wrapper for the MadeOnSol Solana API.
 // Zero dependencies — uses native fetch (Node ≥ 18).
+// Supports MadeOnSol API key (free) and RapidAPI key.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BASE_URL = "https://madeonsol-solana-kol-tracker-tools-api.p.rapidapi.com";
+const DIRECT_BASE_URL = "https://madeonsol.com/api/v1";
+const RAPIDAPI_BASE_URL = "https://madeonsol-solana-kol-tracker-tools-api.p.rapidapi.com";
 const RAPIDAPI_HOST = "madeonsol-solana-kol-tracker-tools-api.p.rapidapi.com";
 
 // ─── Error ───────────────────────────────────────────────────────────────────
@@ -370,14 +372,18 @@ export interface WebhookListResponse {
 // ─── Client config ────────────────────────────────────────────────────────────
 
 export interface MadeOnSolConfig {
-  /** Your RapidAPI key. Get one at https://rapidapi.com. */
+  /**
+   * MadeOnSol API key (starts with `msk_`) or RapidAPI key.
+   * Get a free MadeOnSol API key at https://madeonsol.com/developer
+   * Or subscribe on RapidAPI at https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+   */
   apiKey: string;
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
-function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
-  const url = new URL(`${BASE_URL}${path}`);
+function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>): string {
+  const url = new URL(`${baseUrl}${path}`);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null) {
@@ -391,14 +397,14 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
 // ─── KOL namespace ───────────────────────────────────────────────────────────
 
 class KolClient {
-  constructor(private readonly _fetch: <T>(url: string) => Promise<T>) {}
+  constructor(private readonly _fetch: <T>(url: string) => Promise<T>, private readonly _baseUrl: string) {}
 
   /**
    * Live feed of KOL trades.
    * @param params Optional filters: limit (1–100), action, kol wallet.
    */
   feed(params?: KolFeedParams): Promise<KolFeedResponse> {
-    return this._fetch(buildUrl("/kol/feed", params as Record<string, string | number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/kol/feed", params as Record<string, string | number | undefined>));
   }
 
   /**
@@ -406,7 +412,7 @@ class KolClient {
    * @param params Optional period filter ("today" | "7d" | "30d").
    */
   leaderboard(params?: KolLeaderboardParams): Promise<KolLeaderboardResponse> {
-    return this._fetch(buildUrl("/kol/leaderboard", params as Record<string, string | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/kol/leaderboard", params as Record<string, string | undefined>));
   }
 
   /**
@@ -415,7 +421,7 @@ class KolClient {
    * @param params Optional: include "pnl_by_token" for per-token breakdown.
    */
   wallet(wallet: string, params?: KolWalletParams): Promise<KolWalletProfile> {
-    return this._fetch(buildUrl(`/kol/${encodeURIComponent(wallet)}`, params as Record<string, string | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, `/kol/${encodeURIComponent(wallet)}`, params as Record<string, string | undefined>));
   }
 
   /**
@@ -423,7 +429,7 @@ class KolClient {
    * @param params Optional filters: period, min_kols, limit.
    */
   coordination(params?: KolCoordinationParams): Promise<KolCoordinationResponse> {
-    return this._fetch(buildUrl("/kol/coordination", params as Record<string, string | number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/kol/coordination", params as Record<string, string | number | undefined>));
   }
 
   /**
@@ -431,20 +437,20 @@ class KolClient {
    * @param mint Token mint address.
    */
   token(mint: string): Promise<KolTokenActivity> {
-    return this._fetch(buildUrl(`/kol/tokens/${encodeURIComponent(mint)}`));
+    return this._fetch(buildUrl(this._baseUrl, `/kol/tokens/${encodeURIComponent(mint)}`));
   }
 }
 
 // ─── Deployer namespace ───────────────────────────────────────────────────────
 
 class DeployerClient {
-  constructor(private readonly _fetch: <T>(url: string) => Promise<T>) {}
+  constructor(private readonly _fetch: <T>(url: string) => Promise<T>, private readonly _baseUrl: string) {}
 
   /**
    * Global deployer statistics.
    */
   stats(): Promise<DeployerStats> {
-    return this._fetch(buildUrl("/deployer-hunter/stats"));
+    return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/stats"));
   }
 
   /**
@@ -452,7 +458,7 @@ class DeployerClient {
    * @param params Optional filters: tier, sort, limit, offset.
    */
   leaderboard(params?: DeployerLeaderboardParams): Promise<DeployerLeaderboardResponse> {
-    return this._fetch(buildUrl("/deployer-hunter/leaderboard", params as Record<string, string | number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/leaderboard", params as Record<string, string | number | undefined>));
   }
 
   /**
@@ -460,7 +466,7 @@ class DeployerClient {
    * @param wallet Solana wallet address.
    */
   profile(wallet: string): Promise<DeployerProfile> {
-    return this._fetch(buildUrl(`/deployer-hunter/${encodeURIComponent(wallet)}`));
+    return this._fetch(buildUrl(this._baseUrl, `/deployer-hunter/${encodeURIComponent(wallet)}`));
   }
 
   /**
@@ -470,6 +476,7 @@ class DeployerClient {
    */
   tokens(wallet: string, params?: DeployerTokensParams): Promise<DeployerTokensResponse> {
     return this._fetch(buildUrl(
+      this._baseUrl,
       `/deployer-hunter/${encodeURIComponent(wallet)}/tokens`,
       params as Record<string, number | undefined>,
     ));
@@ -480,7 +487,7 @@ class DeployerClient {
    * @param params Optional filters: since (ISO datetime), limit, offset.
    */
   alerts(params?: DeployerAlertsParams): Promise<DeployerAlertsResponse> {
-    return this._fetch(buildUrl("/deployer-hunter/alerts", params as Record<string, string | number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/alerts", params as Record<string, string | number | undefined>));
   }
 
   /**
@@ -488,7 +495,7 @@ class DeployerClient {
    * @param params Optional: period ("7d" | "30d" | "all").
    */
   alertStats(params?: DeployerAlertStatsParams): Promise<DeployerAlertStats> {
-    return this._fetch(buildUrl("/deployer-hunter/alert-stats", params as Record<string, string | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/alert-stats", params as Record<string, string | undefined>));
   }
 
   /**
@@ -496,7 +503,7 @@ class DeployerClient {
    * @param params Optional: period, limit.
    */
   bestTokens(params?: BestTokensParams): Promise<BestTokensResponse> {
-    return this._fetch(buildUrl("/deployer-hunter/best-tokens", params as Record<string, string | number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/best-tokens", params as Record<string, string | number | undefined>));
   }
 
   /**
@@ -504,21 +511,21 @@ class DeployerClient {
    * @param params Optional: limit.
    */
   recentBonds(params?: RecentBondsParams): Promise<RecentBondsResponse> {
-    return this._fetch(buildUrl("/deployer-hunter/recent-bonds", params as Record<string, number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/recent-bonds", params as Record<string, number | undefined>));
   }
 }
 
 // ─── Tools namespace ─────────────────────────────────────────────────────────
 
 class ToolsClient {
-  constructor(private readonly _fetch: <T>(url: string) => Promise<T>) {}
+  constructor(private readonly _fetch: <T>(url: string) => Promise<T>, private readonly _baseUrl: string) {}
 
   /**
    * Search the MadeOnSol tool directory.
    * @param params Optional: q (search query), category (slug), limit.
    */
   search(params?: ToolsSearchParams): Promise<ToolsSearchResponse> {
-    return this._fetch(buildUrl("/tools/search", params as Record<string, string | number | undefined>));
+    return this._fetch(buildUrl(this._baseUrl, "/tools/search", params as Record<string, string | number | undefined>));
   }
 }
 
@@ -578,10 +585,18 @@ class WebhookClient {
 /**
  * MadeOnSol API client.
  *
+ * Supports two authentication methods:
+ * - **MadeOnSol API key** (recommended) — starts with `msk_`, get one free at https://madeonsol.com/developer
+ * - **RapidAPI key** — subscribe at https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+ *
  * @example
  * ```ts
  * import { MadeOnSol } from "madeonsol";
  *
+ * // With MadeOnSol API key (recommended)
+ * const client = new MadeOnSol({ apiKey: "msk_your_api_key_here" });
+ *
+ * // Or with RapidAPI key
  * const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
  *
  * const { trades } = await client.kol.feed({ limit: 10, action: "buy" });
@@ -602,36 +617,36 @@ export class MadeOnSol {
   readonly webhooks: WebhookClient;
 
   private readonly _apiKey: string;
+  private readonly _isDirect: boolean;
+  private readonly _baseUrl: string;
 
   constructor(config: MadeOnSolConfig) {
     if (!config.apiKey || typeof config.apiKey !== "string") {
-      throw new Error("MadeOnSol: apiKey is required.");
+      throw new Error("MadeOnSol: apiKey is required. Get a free key at madeonsol.com/developer");
     }
     this._apiKey = config.apiKey;
+    this._isDirect = config.apiKey.startsWith("msk_");
+    this._baseUrl = this._isDirect ? DIRECT_BASE_URL : RAPIDAPI_BASE_URL;
 
-    const get = <T>(url: string) => this._request<T>("GET", url);
-    const post = <T>(url: string, body?: unknown) => this._request<T>("POST", url, body);
-    const patch = <T>(url: string, body?: unknown) => this._request<T>("PATCH", url, body);
-    const del = <T>(url: string) => this._request<T>("DELETE", url);
-
-    this.kol = new KolClient(get);
-    this.deployer = new DeployerClient(get);
-    this.tools = new ToolsClient(get);
-    this.stream = new StreamClient(post);
-    this.webhooks = new WebhookClient(get, post, patch, del);
+    const bound = this._request.bind(this);
+    this.kol = new KolClient(bound, this._baseUrl);
+    this.deployer = new DeployerClient(bound, this._baseUrl);
+    this.tools = new ToolsClient(bound, this._baseUrl);
   }
 
-  private async _request<T>(method: string, url: string, body?: unknown): Promise<T> {
-    const options: RequestInit = {
-      method,
-      headers: {
-        "X-RapidAPI-Key": this._apiKey,
-        "X-RapidAPI-Host": RAPIDAPI_HOST,
-        "Accept": "application/json",
-        ...(body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    };
+  private async _request<T>(url: string): Promise<T> {
+    const headers: Record<string, string> = this._isDirect
+      ? {
+          Authorization: `Bearer ${this._apiKey}`,
+          Accept: "application/json",
+        }
+      : {
+          "X-RapidAPI-Key": this._apiKey,
+          "X-RapidAPI-Host": RAPIDAPI_HOST,
+          Accept: "application/json",
+        };
+
+    const response = await fetch(url, { method: "GET", headers });
 
     const response = await fetch(url, options);
 

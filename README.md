@@ -18,7 +18,16 @@ Official TypeScript/JavaScript SDK for the **[MadeOnSol](https://madeonsol.com) 
 | **Webhooks** | Push notifications for KOL trades, coordination signals, and deployer alerts (Pro/Ultra) |
 | **Tool Directory** | Search 950+ Solana tools and dApps indexed on MadeOnSol |
 
-**Links:** [Full API docs](https://madeonsol.com/solana-api) · [Website](https://madeonsol.com) · [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api)
+**Links:** [Full docs](https://madeonsol.com/solana-api) · [Website](https://madeonsol.com) · [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api)
+
+## Authentication
+
+| Method | Format | Best for |
+|---|---|---|
+| **MadeOnSol API key** (recommended) | `msk_...` | Developers — [get a free key](https://madeonsol.com/developer) |
+| RapidAPI key | Standard RapidAPI key | RapidAPI subscribers |
+
+The SDK auto-detects the key type by the `msk_` prefix.
 
 ---
 
@@ -41,7 +50,11 @@ Requires **Node.js ≥ 18** (uses native `fetch`). Works out of the box in Cloud
 ```ts
 import { MadeOnSol } from "madeonsol";
 
-const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
+// With MadeOnSol API key (recommended — get one free at madeonsol.com/developer)
+const client = new MadeOnSol({ apiKey: "msk_your_api_key_here" });
+
+// Or with RapidAPI key
+// const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
 
 // Latest KOL buy trades
 const { trades } = await client.kol.feed({ limit: 10, action: "buy" });
@@ -56,8 +69,6 @@ const { alerts } = await client.deployer.alerts({ limit: 5 });
 // Search Solana tools
 const { tools } = await client.tools.search({ q: "trading", limit: 10 });
 ```
-
-Get your API key at [RapidAPI](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api).
 
 ---
 
