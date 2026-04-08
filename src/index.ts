@@ -33,7 +33,7 @@ export interface PaginationParams {
 // ─── KOL types ───────────────────────────────────────────────────────────────
 
 export type KolAction = "buy" | "sell";
-export type LeaderboardPeriod = "today" | "7d" | "30d";
+export type LeaderboardPeriod = "today" | "7d" | "30d" | "90d" | "180d";
 export type CoordinationPeriod = "1h" | "6h" | "24h" | "7d";
 
 export interface KolFeedParams {
@@ -135,6 +135,87 @@ export interface KolCoordinationResponse {
   count: number;
 }
 
+export type KolPairsPeriod = "7d" | "30d";
+export type KolHotTokensPeriod = "1h" | "6h";
+export type KolTimingPeriod = "7d" | "30d";
+
+export interface KolPairsParams {
+  /** Time period. Default: "7d". */
+  period?: KolPairsPeriod;
+  /** Minimum shared tokens to qualify (1–20). Default: 3. */
+  min_shared?: number;
+  /** Max results (1–50). Default: 20. */
+  limit?: number;
+}
+
+export interface KolPair {
+  kol_a: { name: string; wallet?: string };
+  kol_b: { name: string; wallet?: string };
+  shared_token_count: number;
+  agreement_rate?: number;
+  shared_tokens?: string[];
+}
+
+export interface KolPairsResponse {
+  pairs: KolPair[];
+  period: KolPairsPeriod;
+  min_shared: number;
+}
+
+export interface KolTimingParams {
+  /** Time period. Default: "30d". */
+  period?: KolTimingPeriod;
+}
+
+export interface KolTimingProfile {
+  tokens_traded: number;
+  positions_closed: number;
+  avg_hold_minutes: number | null;
+  median_hold_minutes?: number | null;
+  pct_closed_1h?: number | null;
+  pct_closed_6h?: number | null;
+  pct_closed_24h?: number | null;
+  avg_buy_size_sol?: number | null;
+  avg_sell_size_sol?: number | null;
+  most_active_hours?: number[] | null;
+  hour_distribution?: Record<string, number> | null;
+}
+
+export interface KolTimingResponse {
+  kol: { name: string; wallet?: string };
+  timing: KolTimingProfile;
+  period: KolTimingPeriod;
+}
+
+export interface KolHotTokensParams {
+  /** Time period. Default: "6h". */
+  period?: KolHotTokensPeriod;
+  /** Minimum KOL buyers (1–20). Default: 1. */
+  min_kols?: number;
+  /** Max results (1–50). Default: 20. */
+  limit?: number;
+}
+
+export interface HotToken {
+  token_mint: string;
+  token_symbol: string;
+  token_name: string;
+  kols_total: number;
+  kols_recent: number;
+  acceleration: number;
+  total_buy_sol: number;
+  total_sell_sol: number;
+  net_flow: number;
+  first_kol_buy_age_minutes: number | null;
+  kols?: { name: string; wallet?: string }[];
+}
+
+export interface KolHotTokensResponse {
+  hot_tokens: HotToken[];
+  period: KolHotTokensPeriod;
+  min_kols: number;
+}
+
 export interface KolTokenActivity {
   mint: string;
   token_name: string | null;
@@ -177,6 +258,11 @@ export interface DeployerAlertsParams extends PaginationParams {
   since?: string;
   /** Max results (1–50). Default: 20. */
   limit?: number;
+  /**
+   * Filter alerts by deployer tier.
+   * **PRO/ULTRA only** — BASIC subscribers passing this receive HTTP 403.
+   */
+  tier?: DeployerTier;
 }
 
 export interface DeployerAlertStatsParams {
@@ -299,6 +385,31 @@ export interface RecentBondsResponse {
   count: number;
 }
 
+export interface DeployerTrajectoryData {
+  current_streak: { type: "bond" | "fail" | "none"; count: number };
+  longest_bond_streak: number;
+  longest_fail_streak: number;
+  rolling_bond_rates: { window_end: number; bond_rate: number }[];
+  trend: "improving" | "declining" | "stable";
+  avg_days_between_deploys: number | null;
+  avg_recovery_tokens: number | null;
+  best_stretch: { start_index: number; end_index: number; bond_rate: number } | null;
+  worst_stretch: { start_index: number; end_index: number; bond_rate: number } | null;
+  total_tokens_analyzed: number;
+}
+
+export interface DeployerTrajectoryResponse {
+  deployer: {
+    wallet_address: string;
+    total_tokens_deployed: number;
+    total_bonded: number;
+    bonding_rate: number;
+    recent_bond_rate: number;
+    tier: string;
+  };
+  trajectory: DeployerTrajectoryData;
+}
+
 // ─── Tools types ─────────────────────────────────────────────────────────────
 
 export interface ToolsSearchParams {
@@ -409,7 +520,8 @@ class KolClient {
 
   /**
    * KOL PnL leaderboard.
-   * @param params Optional period filter ("today" | "7d" | "30d").
+   * @param params Optional period filter ("today" | "7d" | "30d" | "90d" | "180d").
+   * KOL trade data is retained for 180 days; the 90d/180d windows fill up over time.
    */
   leaderboard(params?: KolLeaderboardParams): Promise<KolLeaderboardResponse> {
     return this._fetch(buildUrl(this._baseUrl, "/kol/leaderboard", params as Record<string, string | undefined>));
@@ -438,6 +550,31 @@ class KolClient {
    */
   token(mint: string): Promise<KolTokenActivity> {
     return this._fetch(buildUrl(this._baseUrl, `/kol/tokens/${encodeURIComponent(mint)}`));
+  }
+
+  /**
+   * KOL affinity pairs — which KOLs frequently co-trade the same tokens.
+   * @param params Optional: period, min_shared, limit.
+   */
+  pairs(params?: KolPairsParams): Promise<KolPairsResponse> {
+    return this._fetch(buildUrl(this._baseUrl, "/kol/pairs", params as Record<string, string | number | undefined>));
+  }
+
+  /**
+   * KOL entry/exit timing profile — hold duration, exit speed, activity patterns.
+   * @param wallet KOL wallet address.
+   * @param params Optional: period.
+   */
+  timing(wallet: string, params?: KolTimingParams): Promise<KolTimingResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/kol/${encodeURIComponent(wallet)}/timing`, params as Record<string, string | undefined>));
+  }
+
+  /**
+   * KOL momentum tokens — tokens with accelerating KOL buy interest.
+   * @param params Optional: period, min_kols, limit.
+   */
+  hotTokens(params?: KolHotTokensParams): Promise<KolHotTokensResponse> {
+    return this._fetch(buildUrl(this._baseUrl, "/kol/tokens/hot", params as Record<string, string | number | undefined>));
   }
 }
 
@@ -484,7 +621,9 @@ class DeployerClient {
 
   /**
    * Recent deploy alerts from high-quality deployers.
-   * @param params Optional filters: since (ISO datetime), limit, offset.
+   * @param params Optional filters: since (ISO datetime), limit, offset, tier.
+   * The `tier` filter (elite/good/moderate/rising/cold) is **PRO/ULTRA only** —
+   * BASIC subscribers passing it receive HTTP 403.
    */
   alerts(params?: DeployerAlertsParams): Promise<DeployerAlertsResponse> {
     return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/alerts", params as Record<string, string | number | undefined>));
@@ -512,6 +651,15 @@ class DeployerClient {
    */
   recentBonds(params?: RecentBondsParams): Promise<RecentBondsResponse> {
     return this._fetch(buildUrl(this._baseUrl, "/deployer-hunter/recent-bonds", params as Record<string, number | undefined>));
+  }
+
+  /**
+   * Deployer skill curve — streaks, rolling bond rate, improvement trend, deployment cadence.
+   * Requires Pro or Ultra subscription.
+   * @param wallet Deployer wallet address.
+   */
+  trajectory(wallet: string): Promise<DeployerTrajectoryResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/deployer-hunter/${encodeURIComponent(wallet)}/trajectory`));
   }
 }
 

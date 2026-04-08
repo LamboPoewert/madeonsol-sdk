@@ -13,7 +13,7 @@ n> Real-time Solana trading intelligence: track 1,000+ KOL wallets with <3s late
 
 | Feature | Description |
 |---|---|
-| **KOL Tracker** | Real-time trade feed, PnL leaderboard, coordination detection, and per-wallet profiles for 946 tracked KOL wallets |
+| **KOL Tracker** | Real-time trade feed, PnL leaderboard with five time windows (today, 7d, 30d, 90d, 180d), coordination detection, and per-wallet profiles for 1,000+ tracked KOL wallets. **180 days of trade history** retained. |
 | **Deployer Hunter** | Pump.fun deployer scoring, tier leaderboard, deploy alerts, and bonding intelligence |
 | **DEX Trade Stream** | Real-time WebSocket stream of ALL Solana DEX trades — filter by token, wallet, program, or trade size (Ultra) |
 | **Webhooks** | Push notifications for KOL trades, coordination signals, and deployer alerts (Pro/Ultra) |
@@ -111,9 +111,11 @@ KOL PnL leaderboard ranked by realized profit.
 
 ```ts
 const { leaderboard, period } = await client.kol.leaderboard({
-  period: "7d", // "today" | "7d" | "30d", default "7d"
+  period: "7d", // "today" | "7d" | "30d" | "90d" | "180d", default "7d"
 });
 ```
+
+> **180-day retention** — KOL trade data is retained for 180 days (extended from 31 on 2026-04-07). The 90d and 180d windows fill up over time as the trade table accumulates.
 
 Returns: `KolLeaderboardResponse`
 
@@ -229,6 +231,7 @@ Real-time deploy alerts — fired when a tracked deployer launches a new token.
 const { alerts } = await client.deployer.alerts({
   since: "2025-01-01T00:00:00Z", // ISO 8601
   limit: 20,
+  tier: "elite", // "elite" | "good" | "moderate" | "rising" | "cold" — PRO/ULTRA only
   offset: 0,
 });
 ```
