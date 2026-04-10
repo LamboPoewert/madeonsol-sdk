@@ -31,10 +31,15 @@ const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
 
 ### KOL Tracker (client.kol)
 - `client.kol.feed(params?)` - Live KOL trade feed (buy/sell, filter by wallet)
-- `client.kol.leaderboard(params?)` - PnL leaderboard (today, 7d, 30d)
+- `client.kol.leaderboard(params?)` - PnL leaderboard (today, 7d, 30d, 90d, 180d)
 - `client.kol.wallet(wallet, params?)` - Single KOL wallet profile + PnL breakdown
 - `client.kol.coordination(params?)` - Detect coordinated KOL buying (pump signals)
 - `client.kol.token(mint)` - KOL activity for a specific token
+- `client.kol.pnl(wallet, params?)` - Deep per-wallet PnL: equity curve, profit factor, drawdown, positions (7d/30d/90d/180d)
+- `client.kol.trendingTokens(params?)` - Tokens ranked by KOL buy volume (5m–12h windows)
+- `client.kol.pairs(params?)` - KOL affinity pairs — which KOLs co-trade the same tokens
+- `client.kol.timing(wallet, params?)` - Entry/exit timing profile (hold duration, activity hours)
+- `client.kol.hotTokens(params?)` - Tokens with accelerating KOL buy interest
 
 ### Deployer Hunter (client.deployer)
 - `client.deployer.stats()` - Global deployer statistics
