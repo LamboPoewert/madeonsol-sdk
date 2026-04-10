@@ -138,6 +138,8 @@ export interface KolCoordinationResponse {
 export type KolPairsPeriod = "7d" | "30d";
 export type KolHotTokensPeriod = "1h" | "6h";
 export type KolTimingPeriod = "7d" | "30d";
+export type KolPnlPeriod = "7d" | "30d" | "90d" | "180d";
+export type KolTrendingPeriod = "5m" | "15m" | "30m" | "1h" | "2h" | "4h" | "12h";
 
 export interface KolPairsParams {
   /** Time period. Default: "7d". */
@@ -213,6 +215,102 @@ export interface HotToken {
 export interface KolHotTokensResponse {
   hot_tokens: HotToken[];
   period: KolHotTokensPeriod;
+  min_kols: number;
+}
+
+export interface KolPnlParams {
+  /** Time period. Default: "30d". */
+  period?: KolPnlPeriod;
+}
+
+export interface KolPnlSummary {
+  realized_pnl_sol: number;
+  total_volume_sol: number;
+  tokens_traded: number;
+  closed_positions: number;
+  open_positions: number;
+  win_count: number;
+  loss_count: number;
+  win_rate: number | null;
+  profit_factor: number | null;
+  best_trade_pnl_sol: number;
+  worst_trade_pnl_sol: number;
+  avg_roi_pct: number | null;
+  avg_hold_minutes: number;
+  median_hold_minutes: number;
+  max_drawdown_sol: number;
+}
+
+export interface KolPnlCurvePoint {
+  date: string;
+  day_pnl: number;
+  cumulative_pnl: number;
+  trades: number;
+}
+
+export interface KolClosedPosition {
+  token_mint: string;
+  token_symbol: string;
+  token_name: string;
+  buy_count: number;
+  sell_count: number;
+  bought_sol: number;
+  sold_sol: number;
+  pnl_sol: number;
+  roi_pct: number;
+  hold_minutes: number;
+  result: "win" | "loss";
+  first_trade: string;
+  last_trade: string;
+}
+
+export interface KolOpenPosition {
+  token_mint: string;
+  token_symbol: string;
+  token_name: string;
+  buy_count: number;
+  bought_sol: number;
+  first_buy_at: string;
+}
+
+export interface KolPnlResponse {
+  kol: { name: string; wallet?: string; twitter_url?: string; strategy_tag?: string };
+  summary: KolPnlSummary;
+  pnl_curve?: KolPnlCurvePoint[];
+  closed_positions?: KolClosedPosition[];
+  open_positions?: KolOpenPosition[];
+  period: KolPnlPeriod;
+}
+
+export interface KolTrendingParams {
+  /** Time period. Default: "1h". Sub-hour periods (5m/15m/30m) require PRO/ULTRA. */
+  period?: KolTrendingPeriod;
+  /** Minimum KOL buyers (1–20). Default: 1. */
+  min_kols?: number;
+  /** Max results (1–50). Default: 20. */
+  limit?: number;
+}
+
+export interface TrendingToken {
+  token_mint: string;
+  token_symbol: string;
+  token_name: string;
+  buy_volume_sol: number;
+  sell_volume_sol: number;
+  net_flow_sol: number;
+  buy_count: number;
+  sell_count: number;
+  kol_count: number;
+  latest_buy_age_minutes: number | null;
+  token_image_url?: string;
+  first_buy_at?: string;
+  latest_buy_at?: string;
+  kols?: { name: string; wallet?: string }[];
+}
+
+export interface KolTrendingResponse {
+  trending: TrendingToken[];
+  period: KolTrendingPeriod;
   min_kols: number;
 }
 
@@ -575,6 +673,26 @@ class KolClient {
    */
   hotTokens(params?: KolHotTokensParams): Promise<KolHotTokensResponse> {
     return this._fetch(buildUrl(this._baseUrl, "/kol/tokens/hot", params as Record<string, string | number | undefined>));
+  }
+
+  /**
+   * Deep per-wallet PnL breakdown — realized PnL, win rate, profit factor,
+   * max drawdown, daily equity curve, and per-token closed/open positions.
+   * BASIC: summary only. PRO: + curve + closed positions. ULTRA: + open positions.
+   * @param wallet KOL wallet address.
+   * @param params Optional: period (7d/30d/90d/180d).
+   */
+  pnl(wallet: string, params?: KolPnlParams): Promise<KolPnlResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/kol/${encodeURIComponent(wallet)}/pnl`, params as Record<string, string | undefined>));
+  }
+
+  /**
+   * Tokens ranked by KOL buy volume — pure capital-flow signal.
+   * Sub-hour periods (5m/15m/30m) require PRO/ULTRA. BASIC capped at 10 results.
+   * @param params Optional: period (5m–12h), min_kols, limit.
+   */
+  trendingTokens(params?: KolTrendingParams): Promise<KolTrendingResponse> {
+    return this._fetch(buildUrl(this._baseUrl, "/kol/tokens/trending", params as Record<string, string | number | undefined>));
   }
 }
 
