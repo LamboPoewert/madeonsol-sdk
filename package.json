@@ -1,6 +1,6 @@
 {
   "name": "madeonsol",
-  "version": "1.5.0",
+  "version": "1.8.0",
   "description": "Official SDK for the MadeOnSol Solana API — KOL wallet tracking, Pump.fun deployer intelligence, and tool directory",
   "type": "module",
   "main": "dist/index.js",
@@ -37,7 +37,6 @@
     "solana-tools",
     "token",
     "madeonsol",
-    "rapidapi",
     "bonding-curve",
     "smart-money"
   ],

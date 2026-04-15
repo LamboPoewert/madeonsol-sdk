@@ -13,22 +13,19 @@ n> Real-time Solana trading intelligence: track 1,000+ KOL wallets with <3s late
 
 | Feature | Description |
 |---|---|
-| **KOL Tracker** | Real-time trade feed, PnL leaderboard with five time windows (today, 7d, 30d, 90d, 180d), coordination detection, and per-wallet profiles for 1,000+ tracked KOL wallets. **180 days of trade history** retained. |
+| **KOL Tracker** | Real-time trade feed, PnL leaderboard with five time windows (today, 7d, 30d, 90d, 180d), coordination detection, per-wallet profiles, and deep PnL analytics for 1,000+ tracked KOL wallets. **180 days of trade history** retained. |
+| **Alpha Wallet Intel** | Leaderboard of 47,000+ scored early-buyer wallets, full wallet profiles, linked-wallet clustering, token cap-table enrichment, and 0–100 buyer quality scores. |
+| **Wallet Tracker** | Monitor any Solana wallet for swaps and transfers. Track up to 10/50/100 wallets (BASIC/PRO/ULTRA). 120-day event retention. WS events on ULTRA. |
 | **Deployer Hunter** | Pump.fun deployer scoring, tier leaderboard, deploy alerts, and bonding intelligence |
 | **DEX Trade Stream** | Real-time WebSocket stream of ALL Solana DEX trades — filter by token, wallet, program, or trade size (Ultra) |
-| **Webhooks** | Push notifications for KOL trades, coordination signals, and deployer alerts (Pro/Ultra) |
+| **Webhooks** | Push notifications for KOL trades, coordination signals, deployer alerts, and wallet tracker events (Pro/Ultra) |
 | **Tool Directory** | Search 950+ Solana tools and dApps indexed on MadeOnSol |
 
-**Links:** [Full docs](https://madeonsol.com/solana-api) · [Website](https://madeonsol.com) · [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api)
+**Links:** [Full docs](https://madeonsol.com/solana-api) · [Website](https://madeonsol.com) · [API docs](https://madeonsol.com/api-docs)
 
 ## Authentication
 
-| Method | Format | Best for |
-|---|---|---|
-| **MadeOnSol API key** (recommended) | `msk_...` | Developers — [get a free key](https://madeonsol.com/developer) |
-| RapidAPI key | Standard RapidAPI key | RapidAPI subscribers |
-
-The SDK auto-detects the key type by the `msk_` prefix.
+Get a free API key at [madeonsol.com/developer](https://madeonsol.com/developer). Keys start with `msk_`.
 
 ---
 
@@ -51,11 +48,7 @@ Requires **Node.js ≥ 18** (uses native `fetch`). Works out of the box in Cloud
 ```ts
 import { MadeOnSol } from "madeonsol";
 
-// With MadeOnSol API key (recommended — get one free at madeonsol.com/developer)
 const client = new MadeOnSol({ apiKey: "msk_your_api_key_here" });
-
-// Or with RapidAPI key
-// const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
 
 // Latest KOL buy trades
 const { trades } = await client.kol.feed({ limit: 10, action: "buy" });
@@ -160,6 +153,186 @@ const activity = await client.kol.token("EPjFW...");
 ```
 
 Returns: `KolTokenActivity`
+
+---
+
+#### `client.kol.pnl(wallet, params?)`
+
+Deep per-wallet PnL breakdown with equity curve, risk metrics, and position history.
+
+```ts
+const pnl = await client.kol.pnl("7xKX...", {
+  period: "30d", // "7d" | "30d" | "90d" | "180d", default "30d"
+});
+// BASIC: summary stats only
+// PRO: + equity curve + closed positions
+// ULTRA: + open positions
+```
+
+Returns: `KolPnlResponse`
+
+---
+
+#### `client.kol.trendingTokens(params?)`
+
+Tokens ranked by KOL buy volume across multiple time windows.
+
+```ts
+const { tokens } = await client.kol.trendingTokens({
+  period: "1h",    // "5m" | "15m" | "30m" | "1h" | "4h" | "8h" | "12h", default "1h"
+  min_kols: 2,     // minimum distinct KOL buyers
+  limit: 20,       // 1–50, default 20
+});
+// Sub-hour periods (5m, 15m, 30m) require PRO or ULTRA
+```
+
+Returns: `KolTrendingTokensResponse`
+
+---
+
+### Alpha Wallet Intelligence — `client.alpha`
+
+#### `client.alpha.leaderboard(params?)`
+
+Leaderboard of 47,000+ scored early-buyer wallets ranked by win rate, PnL, or ROI.
+
+```ts
+const { wallets } = await client.alpha.leaderboard({
+  period: "30d",   // "7d" | "30d" | "90d", default "30d"
+  sort: "win_rate", // "win_rate" | "pnl" | "roi"
+  min_tokens: 5,
+  exclude_bots: true,
+});
+// BASIC: 25 results, PRO: 100, ULTRA: 500
+```
+
+Returns: `AlphaLeaderboardResponse`
+
+---
+
+#### `client.alpha.wallet(wallet)`
+
+Full profile for an alpha wallet including per-token history and bot signals. ULTRA only.
+
+```ts
+const profile = await client.alpha.wallet("7xKX...");
+```
+
+Returns: `AlphaWalletResponse`
+
+---
+
+#### `client.alpha.linked(wallet)`
+
+Linked-wallet clustering — wallets that co-bought with this address within 2 seconds. ULTRA only.
+
+```ts
+const { linked } = await client.alpha.linked("7xKX...");
+```
+
+Returns: `AlphaLinkedResponse`
+
+---
+
+#### `client.alpha.capTable(mint)`
+
+First buyers for a token enriched with historical win rates, PnL, and KOL identity. PRO/ULTRA.
+
+```ts
+const { buyers } = await client.alpha.capTable("EPjFW...");
+```
+
+Returns: `AlphaCapTableResponse`
+
+---
+
+#### `client.alpha.buyerQuality(mint)`
+
+0–100 cohort quality score based on the profile of a token's first buyers. All tiers. 5-minute cache.
+
+```ts
+const { score } = await client.alpha.buyerQuality("EPjFW...");
+```
+
+Returns: `AlphaBuyerQualityResponse`
+
+---
+
+### Wallet Tracker — `client.walletTracker`
+
+#### `client.walletTracker.watchlist()`
+
+List your tracked wallets and remaining capacity.
+
+```ts
+const { wallets, capacity } = await client.walletTracker.watchlist();
+// capacity: { used, limit } — BASIC: 10, PRO: 50, ULTRA: 100
+```
+
+Returns: `WatchlistResponse`
+
+---
+
+#### `client.walletTracker.addToWatchlist(wallet, params?)`
+
+Add a wallet to your watchlist. Tracking begins immediately.
+
+```ts
+await client.walletTracker.addToWatchlist("7xKX...", { label: "whale" });
+```
+
+---
+
+#### `client.walletTracker.removeFromWatchlist(wallet)`
+
+Remove a wallet from your watchlist.
+
+```ts
+await client.walletTracker.removeFromWatchlist("7xKX...");
+```
+
+---
+
+#### `client.walletTracker.updateLabel(wallet, label)`
+
+Update the label for a tracked wallet.
+
+```ts
+await client.walletTracker.updateLabel("7xKX...", "smart money");
+```
+
+---
+
+#### `client.walletTracker.trades(params?)`
+
+Historical swap and transfer events for your watched wallets. 120-day retention.
+
+```ts
+const { events } = await client.walletTracker.trades({
+  wallet: "7xKX...",    // filter by specific wallet
+  action: "buy",        // "buy" | "sell"
+  event_type: "swap",   // "swap" | "transfer"
+  limit: 50,
+  before: "2026-04-01T00:00:00Z", // ISO 8601 cursor
+});
+```
+
+Returns: `WalletTrackerTradesResponse`
+
+---
+
+#### `client.walletTracker.summary(params?)`
+
+Per-wallet stats across your watchlist: swap counts, SOL bought/sold, last event time.
+
+```ts
+const { wallets } = await client.walletTracker.summary({
+  period: "7d",        // "24h" | "7d" | "30d", default "7d"
+  wallet: "7xKX...",  // optional: single wallet
+});
+```
+
+Returns: `WalletTrackerSummaryResponse`
 
 ---
 
@@ -415,6 +588,26 @@ import type {
   ToolsSearchResponse,
   Tool,
 
+  // KOL PnL & Trending
+  KolPnlResponse,
+  KolTrendingTokensResponse,
+  TrendingToken,
+
+  // Alpha Wallet Intelligence
+  AlphaWalletEntry,
+  AlphaLeaderboardResponse,
+  AlphaWalletResponse,
+  AlphaLinkedResponse,
+  AlphaCapTableResponse,
+  AlphaBuyerQualityResponse,
+
+  // Wallet Tracker
+  WalletEntry,
+  WatchlistResponse,
+  WalletTrackerEvent,
+  WalletTrackerTradesResponse,
+  WalletTrackerSummaryResponse,
+
   // Streaming
   StreamToken,
 
@@ -441,8 +634,16 @@ import type {
 
 - [MadeOnSol website](https://madeonsol.com) — Browse 950+ Solana tools
 - [API documentation](https://madeonsol.com/solana-api) — Interactive endpoint reference
-- [RapidAPI listing](https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api) — Subscribe and get your API key
 - [MadeOnSol on GitHub](https://github.com/LamboPoewert/madeonsol) — Main project repository
+
+## Also Available
+
+| Platform | Package |
+|---|---|
+| Python (LangChain, CrewAI) | [`madeonsol-x402`](https://pypi.org/project/madeonsol-x402/) on PyPI |
+| MCP Server (Claude, Cursor) | [`mcp-server-madeonsol`](https://www.npmjs.com/package/mcp-server-madeonsol) |
+| ElizaOS | [`@madeonsol/plugin-madeonsol`](https://www.npmjs.com/package/@madeonsol/plugin-madeonsol) |
+| Solana Agent Kit | [`solana-agent-kit-plugin-madeonsol`](https://www.npmjs.com/package/solana-agent-kit-plugin-madeonsol) |
 
 ---
 

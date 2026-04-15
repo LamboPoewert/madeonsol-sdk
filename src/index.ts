@@ -2,12 +2,9 @@
 // MadeOnSol SDK
 // Official TypeScript wrapper for the MadeOnSol Solana API.
 // Zero dependencies — uses native fetch (Node ≥ 18).
-// Supports MadeOnSol API key (free) and RapidAPI key.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DIRECT_BASE_URL = "https://madeonsol.com/api/v1";
-const RAPIDAPI_BASE_URL = "https://madeonsol-solana-kol-tracker-tools-api.p.rapidapi.com";
-const RAPIDAPI_HOST = "madeonsol-solana-kol-tracker-tools-api.p.rapidapi.com";
+const BASE_URL = "https://madeonsol.com/api/v1";
 
 // ─── Error ───────────────────────────────────────────────────────────────────
 
@@ -508,6 +505,252 @@ export interface DeployerTrajectoryResponse {
   trajectory: DeployerTrajectoryData;
 }
 
+// ─── Alpha wallet intelligence types ─────────────────────────────────────────
+
+export type AlphaSort = "win_rate" | "pnl" | "roi";
+export type AlphaPeriod = "7d" | "30d" | "all";
+
+export interface AlphaLeaderboardParams {
+  /** Time period. Default: "all". */
+  period?: AlphaPeriod;
+  /** Minimum tokens traded to qualify (1–20). Default: 5. */
+  min_tokens?: number;
+  /** Sort field. Default: "win_rate". */
+  sort?: AlphaSort;
+  /** Exclude medium/high bot-confidence wallets. Default: true. */
+  exclude_bots?: boolean;
+}
+
+export interface AlphaWalletEntry {
+  rank: number;
+  wallet: string;
+  tokens_traded: number;
+  wins: number;
+  losses: number;
+  /** BASIC: integer %. PRO/ULTRA: decimal fraction 0–1 (4dp). */
+  win_rate: number | null;
+  net_pnl_sol: number;
+  // PRO/ULTRA fields
+  total_sol_bought?: number;
+  total_sol_sold?: number;
+  roi?: number | null;
+  avg_rank?: number | null;
+  best_rank?: number | null;
+  total_buys?: number;
+  total_sells?: number;
+  last_seen?: string | null;
+  // ULTRA fields
+  bundle_rate?: number;
+  buy_size_stddev?: number;
+  active_hours?: number | null;
+  bot_confidence?: string | null;
+}
+
+export interface AlphaLeaderboardResponse {
+  leaderboard: AlphaWalletEntry[];
+  total: number;
+  period: AlphaPeriod;
+  sort: AlphaSort;
+  min_tokens: number;
+  exclude_bots: boolean;
+}
+
+export interface AlphaWalletPosition {
+  token_mint: string;
+  token_symbol: string | null;
+  token_name: string | null;
+  first_buy_at: string | null;
+  last_trade_at: string | null;
+  buy_count: number;
+  sell_count: number;
+  total_bought_sol: number;
+  total_sold_sol: number;
+  realized_pnl_sol: number;
+  roi_pct: number | null;
+  result: "win" | "loss" | "open";
+}
+
+export interface AlphaWalletBotSignal {
+  signal: string;
+  detail: string;
+}
+
+export interface AlphaWalletResponse {
+  wallet: string;
+  summary: {
+    tokens_traded: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    net_pnl_sol: number;
+    total_vol_sol: number;
+    roi: number | null;
+    avg_rank: number | null;
+    best_rank: number | null;
+    bundle_rate: number;
+    buy_size_stddev: number;
+    active_hours: number | null;
+    bot_confidence: string;
+    night_only_activity: boolean;
+  };
+  positions: AlphaWalletPosition[];
+  bot_signals: AlphaWalletBotSignal[];
+}
+
+export interface AlphaLinkedWallet {
+  wallet_address: string;
+  shared_tokens: number;
+  similarity_score: number;
+}
+
+export interface AlphaLinkedResponse {
+  wallet: string;
+  linked_wallets: AlphaLinkedWallet[];
+  total: number;
+}
+
+export interface AlphaCapTableBuyer {
+  rank: number;
+  wallet: string;
+  first_buy_sol: number;
+  first_buy_at: string | null;
+  is_bundle: boolean;
+  is_kol: boolean;
+  kol_name: string | null;
+  bot_confidence: string | null;
+  historical_win_rate: number | null;
+  historical_pnl_sol: number | null;
+  historical_tokens: number | null;
+}
+
+export interface AlphaCapTableSummary {
+  known_alpha_wallets: number;
+  known_kols: number;
+  bundle_buyers: number;
+  buyer_quality_score: number;
+  confidence: "low" | "medium" | "high";
+  signal: "positive" | "neutral" | "negative";
+}
+
+export interface AlphaCapTableResponse {
+  mint: string;
+  buyers: AlphaCapTableBuyer[];
+  summary: AlphaCapTableSummary;
+}
+
+export interface AlphaBuyerQualityBreakdown {
+  alpha_wallet_count: number;
+  kol_count: number;
+  bundle_buyer_count: number;
+  avg_historical_win_rate: number | null;
+  bot_dominated: boolean;
+}
+
+export interface AlphaBuyerQualityResponse {
+  mint: string;
+  score: number;
+  confidence: "low" | "medium" | "high";
+  signal: "positive" | "neutral" | "negative";
+  cached_at: string;
+  /** PRO/ULTRA only */
+  breakdown?: AlphaBuyerQualityBreakdown;
+  note?: string;
+}
+
+// ─── Wallet Tracker types ─────────────────────────────────────────────────────
+
+export type WalletTrackerEventType = "swap" | "transfer";
+export type WalletTrackerAction = "buy" | "sell" | "transfer_in" | "transfer_out";
+export type WalletTrackerSummaryPeriod = "24h" | "7d" | "30d";
+
+export interface WatchlistAddParams {
+  /** Solana wallet address to track. */
+  wallet_address: string;
+  /** Optional human-readable label. */
+  label?: string;
+}
+
+export interface WatchlistUpdateParams {
+  /** New label for the wallet, or null to clear it. */
+  label: string | null;
+}
+
+export interface WalletEntry {
+  wallet_address: string;
+  label: string | null;
+  added_at: string;
+}
+
+export interface WatchlistResponse {
+  wallets: WalletEntry[];
+  count: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface WalletTrackerEvent {
+  id: string;
+  wallet_address: string;
+  label: string | null;
+  event_type: WalletTrackerEventType;
+  action: WalletTrackerAction;
+  /** Solana block time (Unix seconds). */
+  block_time: number;
+  /** Block time as ISO string. */
+  block_time_iso: string;
+  token_mint: string | null;
+  token_symbol: string | null;
+  token_name: string | null;
+  sol_amount: number;
+  token_amount: number | null;
+  price_per_token_sol: number | null;
+  counterparty: string | null;
+  /** Transaction signature — BASIC tier: null. */
+  tx_signature: string | null;
+  program: string | null;
+}
+
+export interface WalletTrackerTradesParams {
+  /** Filter by specific wallet address. */
+  wallet?: string;
+  /** Filter by action type. */
+  action?: WalletTrackerAction;
+  /** Filter by event type. */
+  event_type?: WalletTrackerEventType;
+  /** Max results (1–200). Default: 50. */
+  limit?: number;
+  /** Cursor for pagination: block_time of the last item from the previous page. */
+  before?: number;
+}
+
+export interface WalletTrackerTradesResponse {
+  events: WalletTrackerEvent[];
+  count: number;
+}
+
+export interface WalletTrackerWalletStats {
+  wallet_address: string;
+  label: string | null;
+  swap_count: number;
+  buys: number;
+  sells: number;
+  sol_bought: number;
+  sol_sold: number;
+  last_event_at: string | null;
+}
+
+export interface WalletTrackerSummaryParams {
+  /** Time window for stats. Default: "7d". */
+  period?: WalletTrackerSummaryPeriod;
+  /** Filter to a specific wallet address. */
+  wallet?: string;
+}
+
+export interface WalletTrackerSummaryResponse {
+  wallets: WalletTrackerWalletStats[];
+  period: WalletTrackerSummaryPeriod;
+}
+
 // ─── Tools types ─────────────────────────────────────────────────────────────
 
 export interface ToolsSearchParams {
@@ -582,9 +825,8 @@ export interface WebhookListResponse {
 
 export interface MadeOnSolConfig {
   /**
-   * MadeOnSol API key (starts with `msk_`) or RapidAPI key.
-   * Get a free MadeOnSol API key at https://madeonsol.com/developer
-   * Or subscribe on RapidAPI at https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+   * MadeOnSol API key (starts with `msk_`).
+   * Get a free key at https://madeonsol.com/developer
    */
   apiKey: string;
 }
@@ -696,6 +938,62 @@ class KolClient {
   }
 }
 
+// ─── Alpha namespace ─────────────────────────────────────────────────────────
+
+class AlphaClient {
+  constructor(private readonly _fetch: <T>(url: string) => Promise<T>, private readonly _baseUrl: string) {}
+
+  /**
+   * Leaderboard of statistically profitable wallets ranked by win rate, PnL, or ROI.
+   * Scored from 47,000+ early buyers tracked across Pump.fun tokens.
+   * BASIC: 25 results, truncated wallets. PRO: 100. ULTRA: 500 + behavioral signals.
+   * @param params Optional: period, min_tokens, sort, exclude_bots.
+   */
+  leaderboard(params?: AlphaLeaderboardParams): Promise<AlphaLeaderboardResponse> {
+    return this._fetch(buildUrl(this._baseUrl, "/alpha/leaderboard", params as Record<string, string | number | boolean | undefined>));
+  }
+
+  /**
+   * Full alpha profile for a single wallet. Per-token trade history, win rate,
+   * realized PnL, and bot_signals array explaining the confidence rating.
+   * **ULTRA only** — BASIC/PRO receive HTTP 403.
+   * @param wallet Solana wallet address.
+   */
+  wallet(wallet: string): Promise<AlphaWalletResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/alpha/${encodeURIComponent(wallet)}`));
+  }
+
+  /**
+   * Wallets behaviorally linked to this one — co-bought 3+ tokens within a 2-second
+   * window (likely same actor or coordinated group). Returns similarity scores.
+   * **ULTRA only** — BASIC/PRO receive HTTP 403.
+   * @param wallet Solana wallet address.
+   */
+  linked(wallet: string): Promise<AlphaLinkedResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/alpha/${encodeURIComponent(wallet)}/linked`));
+  }
+
+  /**
+   * Cap table: first 10–20 non-deployer early buyers for a token, enriched with
+   * historical win rates, PnL, KOL identity, and bundle flags.
+   * **BASIC**: HTTP 403. **PRO**: top 10, truncated wallets. **ULTRA**: top 20, full wallets.
+   * @param mint Token mint address.
+   */
+  capTable(mint: string): Promise<AlphaCapTableResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/tokens/${encodeURIComponent(mint)}/cap-table`));
+  }
+
+  /**
+   * 0–100 buyer quality score for a token's early-buyer cohort.
+   * Signal: "positive" (>60), "neutral" (40–60), "negative" (<40). 5-minute cache.
+   * BASIC: score + confidence + signal. PRO/ULTRA: + breakdown.
+   * @param mint Token mint address.
+   */
+  buyerQuality(mint: string): Promise<AlphaBuyerQualityResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/tokens/${encodeURIComponent(mint)}/buyer-quality`));
+  }
+}
+
 // ─── Deployer namespace ───────────────────────────────────────────────────────
 
 class DeployerClient {
@@ -781,6 +1079,69 @@ class DeployerClient {
   }
 }
 
+// ─── Wallet Tracker namespace ─────────────────────────────────────────────────
+
+class WalletTrackerClient {
+  constructor(
+    private readonly _get: <T>(url: string) => Promise<T>,
+    private readonly _post: <T>(url: string, body?: unknown) => Promise<T>,
+    private readonly _patch: <T>(url: string, body?: unknown) => Promise<T>,
+    private readonly _delete: <T>(url: string) => Promise<T>,
+    private readonly _baseUrl: string,
+  ) {}
+
+  /**
+   * List your tracked wallets with labels and remaining capacity.
+   */
+  watchlist(): Promise<WatchlistResponse> {
+    return this._get(buildUrl(this._baseUrl, "/wallet-tracker/watchlist"));
+  }
+
+  /**
+   * Add a wallet to your watchlist.
+   * Returns HTTP 409 if already tracked or tier limit is reached.
+   * Limits: BASIC=10, PRO=50, ULTRA=100.
+   * @param params wallet_address (required), label (optional).
+   */
+  addToWatchlist(params: WatchlistAddParams): Promise<WalletEntry & { remaining: number }> {
+    return this._post(buildUrl(this._baseUrl, "/wallet-tracker/watchlist"), params);
+  }
+
+  /**
+   * Remove a wallet from your watchlist.
+   * @param address Solana wallet address to remove.
+   */
+  removeFromWatchlist(address: string): Promise<{ success: boolean }> {
+    return this._delete(buildUrl(this._baseUrl, `/wallet-tracker/watchlist/${encodeURIComponent(address)}`));
+  }
+
+  /**
+   * Update a wallet's label.
+   * @param address Solana wallet address.
+   * @param params label (string to set, null to clear).
+   */
+  updateLabel(address: string, params: WatchlistUpdateParams): Promise<WalletEntry> {
+    return this._patch(buildUrl(this._baseUrl, `/wallet-tracker/watchlist/${encodeURIComponent(address)}`), params);
+  }
+
+  /**
+   * Historical events (swaps + transfers) for all watched wallets.
+   * BASIC: truncated wallets, no tx_signature, no counterparty.
+   * @param params Optional filters: wallet, action, event_type, limit (max 200), before (cursor).
+   */
+  trades(params?: WalletTrackerTradesParams): Promise<WalletTrackerTradesResponse> {
+    return this._get(buildUrl(this._baseUrl, "/wallet-tracker/trades", params as Record<string, string | number | undefined>));
+  }
+
+  /**
+   * Per-wallet stats (swap counts, SOL bought/sold, last activity).
+   * @param params Optional: period (24h/7d/30d), wallet (filter to one address).
+   */
+  summary(params?: WalletTrackerSummaryParams): Promise<WalletTrackerSummaryResponse> {
+    return this._get(buildUrl(this._baseUrl, "/wallet-tracker/summary", params as Record<string, string | undefined>));
+  }
+}
+
 // ─── Tools namespace ─────────────────────────────────────────────────────────
 
 class ToolsClient {
@@ -853,18 +1214,13 @@ class WebhookClient {
  * MadeOnSol API client.
  *
  * Supports two authentication methods:
- * - **MadeOnSol API key** (recommended) — starts with `msk_`, get one free at https://madeonsol.com/developer
- * - **RapidAPI key** — subscribe at https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+ * - **MadeOnSol API key** — starts with `msk_`, get one free at https://madeonsol.com/developer
  *
  * @example
  * ```ts
  * import { MadeOnSol } from "madeonsol";
  *
- * // With MadeOnSol API key (recommended)
  * const client = new MadeOnSol({ apiKey: "msk_your_api_key_here" });
- *
- * // Or with RapidAPI key
- * const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
  *
  * const { trades } = await client.kol.feed({ limit: 10, action: "buy" });
  * const { deployers } = await client.deployer.leaderboard({ tier: "elite" });
@@ -876,15 +1232,18 @@ export class MadeOnSol {
   readonly kol: KolClient;
   /** Pump.fun deployer intelligence endpoints. */
   readonly deployer: DeployerClient;
+  /** Alpha wallet intelligence: leaderboard, profiles, cap tables, buyer quality. */
+  readonly alpha: AlphaClient;
   /** Solana tool directory endpoints. */
   readonly tools: ToolsClient;
   /** WebSocket streaming token (Pro/Ultra). */
   readonly stream: StreamClient;
   /** Webhook management (Pro/Ultra). */
   readonly webhooks: WebhookClient;
+  /** Wallet tracker: watchlist CRUD, trades, and per-wallet stats. */
+  readonly walletTracker: WalletTrackerClient;
 
   private readonly _apiKey: string;
-  private readonly _isDirect: boolean;
   private readonly _baseUrl: string;
 
   constructor(config: MadeOnSolConfig) {
@@ -892,8 +1251,7 @@ export class MadeOnSol {
       throw new Error("MadeOnSol: apiKey is required. Get a free key at madeonsol.com/developer");
     }
     this._apiKey = config.apiKey;
-    this._isDirect = config.apiKey.startsWith("msk_");
-    this._baseUrl = this._isDirect ? DIRECT_BASE_URL : RAPIDAPI_BASE_URL;
+    this._baseUrl = BASE_URL;
 
     const boundGet = this._request.bind(this);
     const boundPost = ((url: string, body?: unknown) => this._requestWithBody("POST", url, body)) as <T>(url: string, body?: unknown) => Promise<T>;
@@ -902,15 +1260,15 @@ export class MadeOnSol {
 
     this.kol = new KolClient(boundGet, this._baseUrl);
     this.deployer = new DeployerClient(boundGet, this._baseUrl);
+    this.alpha = new AlphaClient(boundGet, this._baseUrl);
     this.tools = new ToolsClient(boundGet, this._baseUrl);
     this.stream = new StreamClient(boundPost, this._baseUrl);
     this.webhooks = new WebhookClient(boundGet, boundPost, boundPatch, boundDelete, this._baseUrl);
+    this.walletTracker = new WalletTrackerClient(boundGet, boundPost, boundPatch, boundDelete, this._baseUrl);
   }
 
   private _headers(): Record<string, string> {
-    return this._isDirect
-      ? { Authorization: `Bearer ${this._apiKey}`, Accept: "application/json" }
-      : { "X-RapidAPI-Key": this._apiKey, "X-RapidAPI-Host": RAPIDAPI_HOST, Accept: "application/json" };
+    return { Authorization: `Bearer ${this._apiKey}`, Accept: "application/json" };
   }
 
   private async _request<T>(url: string): Promise<T> {

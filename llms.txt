@@ -9,7 +9,8 @@ MadeOnSol (https://madeonsol.com) is the largest Solana ecosystem tool directory
 - **KOL Tracker**: Real-time trade feed for 946 tracked Solana KOL (Key Opinion Leader) wallets, PnL leaderboards, coordination detection, and per-wallet profiles.
 - **Deployer Hunter**: Pump.fun deployer wallet scoring, tier-based leaderboards, deploy alerts, and bonding curve intelligence.
 - **DEX Trade Stream**: Real-time WebSocket stream of ALL Solana DEX trades across 9 programs (Ultra only). Filter by token, wallet, program, trade size, or direction.
-- **Webhooks**: Push notifications for KOL trades, deployer alerts, and coordination signals (Pro/Ultra).
+- **Wallet Tracker**: Track up to 100 Solana wallets for real-time swap and transfer events. Webhooks + WebSocket (ULTRA) delivery.
+- **Webhooks**: Push notifications for KOL trades, deployer alerts, coordination signals, and wallet tracker events (Pro/Ultra).
 - **Tool Directory**: Search and browse 950+ Solana tools and dApps.
 
 ## Installation
@@ -20,11 +21,11 @@ npm install madeonsol
 
 ## Authentication
 
-Get your API key at: https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
+Get a free API key at: https://madeonsol.com/developer
 
 ```typescript
 import { MadeOnSol } from "madeonsol";
-const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
+const client = new MadeOnSol({ apiKey: "msk_your_api_key_here" });
 ```
 
 ## Available Methods
@@ -57,6 +58,14 @@ const client = new MadeOnSol({ apiKey: "your-rapidapi-key" });
 ### WebSocket Streaming (client.stream) — Pro/Ultra
 - `client.stream.getToken()` - Get 24h WebSocket token. Returns ws_url (KOL/deployer events) and dex_ws_url (all-DEX trades, Ultra only)
 
+### Wallet Tracker (client.walletTracker)
+- `client.walletTracker.watchlist()` - List tracked wallets with labels and remaining capacity (BASIC: 10, PRO: 50, ULTRA: 100)
+- `client.walletTracker.addToWatchlist(params)` - Add a wallet (wallet_address, label?). Returns 409 if already tracked or limit reached.
+- `client.walletTracker.removeFromWatchlist(address)` - Remove a wallet
+- `client.walletTracker.updateLabel(address, params)` - Update a wallet's label (label: string | null)
+- `client.walletTracker.trades(params?)` - Historical swap/transfer events (wallet, action, event_type, limit max 200, before cursor)
+- `client.walletTracker.summary(params?)` - Per-wallet stats: swap counts, SOL bought/sold, last activity (period: 24h/7d/30d)
+
 ### Webhooks (client.webhooks) — Pro/Ultra
 - `client.webhooks.list()` - List all webhooks
 - `client.webhooks.create(params)` - Create webhook (url, events, filters)
@@ -72,6 +81,5 @@ All methods throw `MadeOnSolError` with `.message`, `.status`, and `.body` prope
 
 - Documentation: https://madeonsol.com/solana-api
 - Website: https://madeonsol.com
-- RapidAPI: https://rapidapi.com/ClaudeTools/api/madeonsol-solana-kol-tracker-tools-api
 - GitHub: https://github.com/LamboPoewert/madeonsol-sdk
 - npm: https://www.npmjs.com/package/madeonsol
