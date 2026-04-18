@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 Official TypeScript/JavaScript SDK for the **[MadeOnSol](https://madeonsol.com) Solana API** — zero dependencies, fully typed, works in Node.js ≥ 18 and edge runtimes.
-n> Real-time Solana trading intelligence: track 1,000+ KOL wallets with <3s latency, score 6,700+ Pump.fun deployers by reputation, detect multi-KOL coordination signals, and stream every DEX trade. Free tier: 200 requests/day at [madeonsol.com/developer](https://madeonsol.com/developer) — no credit card required.
+> Real-time Solana trading intelligence: track 1,000+ KOL wallets with <3s latency, score 6,700+ Pump.fun deployers by reputation, detect multi-KOL coordination signals, and stream every DEX trade across 9+ programs. Free tier: 200 requests/day at [madeonsol.com/developer](https://madeonsol.com/developer) — no credit card required.
 
 > **Build Solana trading bots, analytics dashboards, KOL copy-trading tools, deployer sniper bots, and ecosystem browsers.**
 
@@ -485,15 +485,103 @@ console.log(token.dex_ws_url);  // wss://madeonsol.com/ws/v1/dex-stream (Ultra o
 
 Returns: `StreamToken` — `{ token, expires_at, ws_url, dex_ws_url?, usage }`
 
-**DEX Trade Stream (Ultra):** Connect to `dex_ws_url` and subscribe with filters:
+---
+
+### DEX Firehose (Ultra) — `wss://madeonsol.com/ws/v1/dex-stream`
+
+Real-time trades across **9+ Solana DEX programs** (Pump.fun, PumpAMM, PumpSwap, Raydium AMM/CPMM/CAMM, Jupiter v6, Orca Whirlpool, Meteora DBC/DAMM, LaunchLab/bonk.fun) on a single normalized WebSocket. Server-side filters drop everything you don't care about before it hits your socket.
+
+**Limits:** ULTRA = 2 connections, **10 named subscriptions per connection**, up to **500 trades replay** from in-memory ring buffer. Inbound rate limit: 5 messages/sec (excess emits one error per second).
+
+#### Quick start
 
 ```ts
-ws.send(JSON.stringify({
-  type: "subscribe",
-  filters: { program: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", min_sol: 0.5 }
-}));
-// Filters: token_mint, token_mints (max 50), wallet, wallets (max 50), program, min_sol, max_sol, action
+import { WebSocket } from "ws"; // or native WebSocket in browsers/Bun
+
+const { token, dex_ws_url } = await client.stream.getToken();
+const ws = new WebSocket(`${dex_ws_url}?token=${token}`);  // token MUST be appended as query param
+
+ws.on("open", () => {
+  // Multi-subscription: each sub has its own sub_id and filters
+  ws.send(JSON.stringify({
+    type: "subscribe",
+    sub_id: "fresh-pumpfun",
+    replay: 50,                   // backfill up to 500 from ring buffer
+    filters: {
+      dex: "pumpfun",
+      token_age_max_seconds: 300, // first seen in last 5 min
+      min_sol: 0.5,
+      action: "buy",
+    },
+  }));
+});
+
+ws.on("message", (raw) => {
+  const msg = JSON.parse(raw.toString());
+  if (msg.channel === "dex:trades") {
+    // { sub_id, data: { wallet, mint, action, sol_amount, token_amount, dex, ... }, replay, ts }
+    console.log(msg.sub_id, msg.data.dex, msg.data.action, msg.data.sol_amount);
+  }
+});
 ```
+
+#### Protocol — client → server
+
+| `type` | Required fields | Notes |
+|---|---|---|
+| `subscribe` | `sub_id`, `filters` | Optional `replay: 1–500` |
+| `update` | `sub_id`, `filters` | Replaces filters in place — no disconnect needed |
+| `unsubscribe` | `sub_id` | Or omit `sub_id` to clear all subs |
+| `list` | — | Server replies with `{ type: "list", subs: [...] }` |
+| `ping` | — | Heartbeat — server replies `{ type: "pong" }` |
+
+#### Server → client message shapes
+
+```ts
+{ type: "connected",    tier: "ULTRA", capabilities: { max_subs: 10, max_replay: 500, dex_names: [...], deployer_tiers: [...] } }  // on connect
+{ type: "subscribed",   sub_id: "fresh-pumpfun", filters: { ... } }
+{ type: "replay_done",  sub_id: "fresh-pumpfun", count: 50 }              // after backfill
+{ type: "updated",      sub_id: "fresh-pumpfun", filters: { ... } }
+{ type: "unsubscribed", sub_id: "fresh-pumpfun" }
+{ type: "list",         subs: [{ sub_id, filters }] }                     // reply to { type: "list" }
+{ type: "heartbeat",    ts: 1712160000000 }                               // every 30s
+{ type: "error",        sub_id?, message: "..." }
+{ channel: "dex:trades", sub_id, data: { ... }, replay: false, ts: 1712160000000 }
+```
+
+#### Filter dimensions
+
+At least **one targeting filter** is required (otherwise the firehose would dump every trade). Filters compose with AND semantics.
+
+| Filter | Type | Notes |
+|---|---|---|
+| `token_mint` / `token_mints` | string / string[] (≤50) | Targeting |
+| `wallet` / `wallets` | string / string[] (≤50) | Targeting |
+| `dex` | string \| string[] | `pumpfun`, `pumpamm`, `pumpswap`, `raydium`, `jupiter`, `orca`, `meteora`, `launchlab` |
+| `program` | string | Raw program ID |
+| `deployer_tier` | string \| string[] | `elite`, `good`, `moderate`, `rising`, `cold`, `unranked` (uses Deployer Hunter scoring) |
+| `token_age_max_seconds` | number | Only trades on mints first seen within window (uses persisted first-seen table) |
+| `market_cap_min_sol` / `market_cap_max_sol` | number | Bounded by current market cap (last trade price × cached supply, 1h TTL) |
+| `min_sol` / `max_sol` | number | Trade size bounds |
+| `action` | `"buy"` \| `"sell"` | Direction |
+
+**Async filters** (`token_age`, `deployer_tier`, `market_cap`) evaluate against live state and are **skipped on replay**. The first trade for an unseen mint may be skipped while the supply fetch is in flight.
+
+#### Multi-sub example
+
+```ts
+ws.send(JSON.stringify({ type: "subscribe", sub_id: "snipers",  filters: { token_age_max_seconds: 60 } }));
+ws.send(JSON.stringify({ type: "subscribe", sub_id: "whales",   filters: { min_sol: 50 } }));
+ws.send(JSON.stringify({ type: "subscribe", sub_id: "kol-mints", filters: { token_mints: ["EPjF...", "So11..."] } }));
+
+// Tighten the snipers filter without disconnecting
+ws.send(JSON.stringify({ type: "update", sub_id: "snipers", filters: { token_age_max_seconds: 30, min_sol: 0.3 } }));
+
+// Drop whales when you're done
+ws.send(JSON.stringify({ type: "unsubscribe", sub_id: "whales" }));
+```
+
+Each `dex:trades` message echoes the `sub_id` that matched, so you can route them locally without reapplying filter logic client-side.
 
 ---
 

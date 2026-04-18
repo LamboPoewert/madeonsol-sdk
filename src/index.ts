@@ -32,6 +32,16 @@ export interface PaginationParams {
 export type KolAction = "buy" | "sell";
 export type LeaderboardPeriod = "today" | "7d" | "30d" | "90d" | "180d";
 export type CoordinationPeriod = "1h" | "6h" | "24h" | "7d";
+export type KolStrategy = "scalper" | "day_trader" | "swing_trader" | "hodler" | "mixed";
+export type KolLeaderboardSort =
+  | "pnl"
+  | "winrate"
+  | "volume"
+  | "avg_roi"
+  | "profit_factor"
+  | "early_entry_pct"
+  | "consistency";
+export type KolWalletInclude = "pnl_by_token" | "recent_winners" | "recent_losers";
 
 export interface KolFeedParams {
   /** Number of trades to return (1–100). Default: 50. */
@@ -40,16 +50,34 @@ export interface KolFeedParams {
   action?: KolAction;
   /** Filter by a specific KOL wallet address. */
   kol?: string;
+  /** Minimum SOL amount per trade. */
+  min_sol?: number;
+  /** Maximum token age in minutes at trade time. */
+  token_age_max_min?: number;
+  /** Return only buys — convenience alias for action="buy". */
+  exclude_sells?: boolean;
+  /** Only trades by KOLs with 7d win rate >= this (0–100). */
+  min_kol_winrate?: number;
+  /** Filter by auto-classified strategy tag. */
+  strategy?: KolStrategy;
 }
 
 export interface KolLeaderboardParams {
   /** Time window for ranking. Default: "7d". */
   period?: LeaderboardPeriod;
+  /** Sort key. Default: "pnl". */
+  sort?: KolLeaderboardSort;
+  /** Filter by auto-classified strategy tag. */
+  strategy?: KolStrategy;
+  /** Minimum 7d win rate (0–100). */
+  min_winrate?: number;
+  /** Max results (1–100). Default: 50. */
+  limit?: number;
 }
 
 export interface KolWalletParams {
-  /** Comma-separated extras to include, e.g. "pnl_by_token". */
-  include?: "pnl_by_token";
+  /** Comma-separated extras: "pnl_by_token", "recent_winners", "recent_losers". PRO/ULTRA only. */
+  include?: KolWalletInclude | string;
 }
 
 export interface KolCoordinationParams {
@@ -59,6 +87,10 @@ export interface KolCoordinationParams {
   min_kols?: number;
   /** Max results (1–50). Default: 20. */
   limit?: number;
+  /** Minimum average 7d win rate across cluster KOLs (0–100). */
+  min_avg_winrate?: number;
+  /** Require at least 2 distinct strategy tags in the cluster (filters echo chambers). */
+  unique_strategies?: boolean;
 }
 
 export interface KolTrade {
@@ -193,6 +225,10 @@ export interface KolHotTokensParams {
   min_kols?: number;
   /** Max results (1–50). Default: 20. */
   limit?: number;
+  /** Minimum average 7d win rate across KOL buyers (0–100). */
+  min_avg_winrate?: number;
+  /** Require at least 2 distinct strategy tags among the KOLs. */
+  unique_strategies?: boolean;
 }
 
 export interface HotToken {
@@ -321,6 +357,146 @@ export interface KolTokenActivity {
   sell_count: number;
   total_sol_volume: number;
   recent_trades: KolTrade[];
+}
+
+// ─── KOL entry-order ─────────────────────────────────────────────────────────
+
+export interface KolEntryOrderParams {
+  /** Max entries to return (1–100). Default: 50. */
+  limit?: number;
+}
+
+export interface KolEntryOrderEntry {
+  rank: number;
+  kol_name: string | null;
+  kol_twitter: string | null;
+  wallet: string;
+  strategy_tag: KolStrategy | string | null;
+  auto_strategy_tag: KolStrategy | string | null;
+  winrate_7d: number | null;
+  winrate_30d: number | null;
+  early_entry_pct_30d: number | null;
+  percentile_pnl_7d?: number | null;
+  percentile_winrate_7d?: number | null;
+  first_buy_at: string;
+  seconds_after_first: number;
+  sol_amount: number;
+  token_amount: number;
+  tx_signature?: string;
+}
+
+export interface KolEntryOrderResponse {
+  token_mint: string;
+  token_name: string | null;
+  token_symbol: string | null;
+  total_kol_buyers: number;
+  first_buy_at: string;
+  last_buy_at: string;
+  span_sec: number;
+  entries: KolEntryOrderEntry[];
+}
+
+// ─── KOL compare ─────────────────────────────────────────────────────────────
+
+export interface KolCompareParams {
+  /** 2–5 Solana wallet addresses. Tier limit: BASIC=2, PRO=4, ULTRA=5. */
+  wallets: string[];
+}
+
+export interface KolCompareProfile {
+  wallet: string;
+  found: boolean;
+  name?: string;
+  twitter_url?: string | null;
+  strategy_tag?: KolStrategy | string | null;
+  auto_strategy_tag?: KolStrategy | string | null;
+  winrate_7d?: number | null;
+  winrate_30d?: number | null;
+  avg_roi_7d?: number | null;
+  avg_roi_30d?: number | null;
+  profit_factor_7d?: number | null;
+  profit_factor_30d?: number | null;
+  pnl_7d?: number | null;
+  pnl_30d?: number | null;
+  early_entry_pct_30d?: number | null;
+  consistency_7d?: number | null;
+  median_hold_minutes_30d?: number | null;
+  closed_positions_7d?: number;
+  closed_positions_30d?: number;
+  is_heating_up?: boolean;
+  is_cold?: boolean;
+  percentile_pnl_7d?: number | null;
+  percentile_winrate_7d?: number | null;
+  percentile_pnl_30d?: number | null;
+  percentile_winrate_30d?: number | null;
+  percentile_early_entry_30d?: number | null;
+}
+
+export interface KolCompareOverlapToken {
+  token_mint: string;
+  token_symbol: string | null;
+  token_name: string | null;
+  wallets: string[];
+  buy_count: number;
+}
+
+export interface KolCompareResponse {
+  profiles: KolCompareProfile[];
+  /** Tokens bought by 2+ of the provided wallets in the last 30d (PRO+ only). */
+  overlap?: KolCompareOverlapToken[];
+}
+
+// ─── KOL alerts ──────────────────────────────────────────────────────────────
+
+export type KolAlertType = "consensus_cluster" | "fresh_token_kol_buy" | "heating_up";
+export type KolAlertWindow = "1h" | "6h" | "24h";
+export type KolAlertSeverity = "low" | "medium" | "high";
+
+export interface KolAlertsParams {
+  /** Detection window. Default: "6h". */
+  window?: KolAlertWindow;
+  /** Max alerts to return (1–100). Default: 30. */
+  limit?: number;
+  /** Restrict to specific alert types (default: all). */
+  types?: KolAlertType[];
+}
+
+export interface KolAlert {
+  type: KolAlertType;
+  severity: KolAlertSeverity;
+  detected_at: string | null;
+  // Shape varies by type — these are common fields.
+  token_mint?: string;
+  token_symbol?: string | null;
+  token_name?: string | null;
+  wallet?: string;
+  kol_name?: string | null;
+  kol_twitter?: string | null;
+  // consensus_cluster
+  kol_count?: number;
+  net_sol_flow?: number;
+  signal?: "accumulating" | "distributing";
+  time_to_consensus_sec?: number | null;
+  first_buy_at?: string | null;
+  kols?: string[] | Array<{ name: string; wallet?: string }>;
+  // fresh_token_kol_buy
+  token_age_minutes?: number;
+  kol_winrate_7d?: number | null;
+  kol_percentile_pnl_7d?: number | null;
+  sol_amount?: number;
+  // heating_up
+  strategy_tag?: KolStrategy | string | null;
+  winrate_7d?: number | null;
+  pnl_7d?: number;
+  closed_positions_7d?: number;
+  percentile_pnl_7d?: number | null;
+}
+
+export interface KolAlertsResponse {
+  alerts: KolAlert[];
+  count: number;
+  window: KolAlertWindow;
+  types: KolAlertType[];
 }
 
 // ─── Deployer Hunter types ────────────────────────────────────────────────────
@@ -935,6 +1111,37 @@ class KolClient {
    */
   trendingTokens(params?: KolTrendingParams): Promise<KolTrendingResponse> {
     return this._fetch(buildUrl(this._baseUrl, "/kol/tokens/trending", params as Record<string, string | number | undefined>));
+  }
+
+  /**
+   * Ranked list of KOL buyers for a token, ordered by first-buy timestamp.
+   * Each entry includes KOL identity, strategy tag, win rate, early-entry %, and time delta from the first KOL entry.
+   * @param mint Token mint address.
+   * @param params Optional: limit (1–100).
+   */
+  tokenEntryOrder(mint: string, params?: KolEntryOrderParams): Promise<KolEntryOrderResponse> {
+    return this._fetch(buildUrl(this._baseUrl, `/kol/tokens/${encodeURIComponent(mint)}/entry-order`, params as Record<string, string | number | undefined>));
+  }
+
+  /**
+   * Side-by-side comparison of 2–5 KOL wallets.
+   * Returns full scores (winrate/ROI/profit factor/early entry/consistency) and, on PRO+, a 30d overlap array.
+   * Tier limits: BASIC=2, PRO=4, ULTRA=5.
+   * @param params Required: wallets (2–5 Solana addresses).
+   */
+  compare(params: KolCompareParams): Promise<KolCompareResponse> {
+    return this._fetch(buildUrl(this._baseUrl, "/kol/compare", { wallets: params.wallets.join(",") } as Record<string, string>));
+  }
+
+  /**
+   * Live feed of notable KOL events: consensus clusters, fresh-launch KOL buys, and heating-up wallets.
+   * @param params Optional: window (1h/6h/24h), types (subset), limit.
+   */
+  alerts(params?: KolAlertsParams): Promise<KolAlertsResponse> {
+    const { types, ...rest } = params ?? {};
+    const flat: Record<string, string | number | undefined> = { ...(rest as Record<string, string | number | undefined>) };
+    if (types && types.length > 0) flat.types = types.join(",");
+    return this._fetch(buildUrl(this._baseUrl, "/kol/alerts/recent", flat));
   }
 }
 
