@@ -91,6 +91,12 @@ export interface KolCoordinationParams {
   min_avg_winrate?: number;
   /** Require at least 2 distinct strategy tags in the cluster (filters echo chambers). */
   unique_strategies?: boolean;
+  /** v1.1 — Include major memecoins (WIF/BONK/POPCAT). Default: false. */
+  include_majors?: boolean;
+  /** v1.1 — Peak-density sliding window in minutes (1–60). Default: 15. */
+  window_minutes?: number;
+  /** v1.1 — Minimum composite coordination score (0–100). Default: 0. */
+  min_score?: number;
 }
 
 export interface KolTrade {
@@ -147,21 +153,126 @@ export interface KolWalletProfile {
   pnl_by_token?: KolPnlByToken[];
 }
 
+export interface CoordinationKol {
+  name: string;
+  wallet: string;
+  /** v1.1 — Sum of SOL spent by this KOL (PRO+ sees buy_sol/sell_sol/exited). */
+  buy_sol?: number;
+  sell_sol?: number;
+  /** v1.1 — True if sell_sol > buy_sol (net-flow-negative). */
+  exited?: boolean;
+}
+
 export interface CoordinatedToken {
-  mint: string;
+  token_mint: string;
   token_name: string | null;
   token_symbol: string | null;
   kol_count: number;
-  wallets: string[];
-  total_sol_volume: number;
-  first_seen: string;
-  last_seen: string;
+  total_buys: number;
+  total_sells: number;
+  net_sol_flow: number;
+  signal: "accumulating" | "distributing";
+  avg_winrate_7d: number | null;
+  entry_rank_avg: number | null;
+  unique_strategies: number;
+  strategies: string[];
+  first_buy_at: string;
+  last_buy_at: string;
+  time_to_consensus_sec: number;
+  /** v1.1 — Peak density window (busiest N-minute stretch in the cluster). */
+  peak_window_start?: string;
+  peak_window_end?: string;
+  peak_kols?: number;
+  peak_buys?: number;
+  /** v1.1 — Count of wallets that exited (net-flow-negative). */
+  exited_count?: number;
+  holders_count?: number;
+  /** v1.1 — Composite 0–100 coordination score. */
+  coordination_score?: number;
+  kols?: CoordinationKol[];
 }
 
 export interface KolCoordinationResponse {
-  tokens: CoordinatedToken[];
-  period: CoordinationPeriod;
-  count: number;
+  coordination: CoordinatedToken[];
+  /** v1.1 — Score formula version; bumped when weights change. */
+  score_version?: string;
+  /** v1.1 — Peak-density window used for this response. */
+  window_minutes?: number;
+}
+
+// ─── Coordination alerts (v1.1) ─────────────────────────────────────────────
+
+export type CoordinationDeliveryMode = "websocket" | "webhook" | "both";
+
+export interface CoordinationAlertRule {
+  id: string;
+  name: string | null;
+  min_kols: number;
+  window_minutes: number;
+  min_score: number;
+  include_majors: boolean;
+  cooldown_min: number;
+  score_jump_break: number;
+  delivery_mode: CoordinationDeliveryMode;
+  webhook_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CoordinationAlertCreateParams {
+  name?: string;
+  /** 2–50. Default: 5. */
+  min_kols?: number;
+  /** 1–60. Default: 15. */
+  window_minutes?: number;
+  /** 0–100. Default: 0. */
+  min_score?: number;
+  include_majors?: boolean;
+  /** 1–1440 minutes. Default: 30. */
+  cooldown_min?: number;
+  /** Early re-fire when new score ≥ last_score + score_jump_break. 0–100. Default: 20. */
+  score_jump_break?: number;
+  /** Default: "websocket". */
+  delivery_mode?: CoordinationDeliveryMode;
+  /** Required when delivery_mode is "webhook" or "both". Must be HTTPS. */
+  webhook_url?: string;
+}
+
+export interface CoordinationAlertUpdateParams {
+  name?: string | null;
+  min_kols?: number;
+  window_minutes?: number;
+  min_score?: number;
+  include_majors?: boolean;
+  cooldown_min?: number;
+  score_jump_break?: number;
+  delivery_mode?: CoordinationDeliveryMode;
+  webhook_url?: string | null;
+  is_active?: boolean;
+}
+
+export interface CoordinationAlertListResponse {
+  rules: CoordinationAlertRule[];
+}
+
+export interface CoordinationAlertCreateResponse {
+  rule: CoordinationAlertRule;
+  /** One-time HMAC secret. Save it — will not be shown again. */
+  webhook_secret: string | null;
+  note?: string;
+}
+
+export interface CoordinationAlertGetResponse {
+  rule: CoordinationAlertRule;
+}
+
+export interface CoordinationAlertUpdateResponse {
+  rule: CoordinationAlertRule;
+}
+
+export interface CoordinationAlertDeleteResponse {
+  deleted: true;
 }
 
 export type KolPairsPeriod = "7d" | "30d";
@@ -1349,6 +1460,50 @@ class WalletTrackerClient {
   }
 }
 
+// ─── Coordination alerts namespace (v1.1) ───────────────────────────────────
+
+class CoordinationAlertsClient {
+  constructor(
+    private readonly _get: <T>(url: string) => Promise<T>,
+    private readonly _post: <T>(url: string, body?: unknown) => Promise<T>,
+    private readonly _patch: <T>(url: string, body?: unknown) => Promise<T>,
+    private readonly _delete: <T>(url: string) => Promise<T>,
+    private readonly _baseUrl: string,
+  ) {}
+
+  /**
+   * List your coordination alert rules.
+   * Requires PRO or ULTRA.
+   */
+  list(): Promise<CoordinationAlertListResponse> {
+    return this._get(buildUrl(this._baseUrl, "/kol/coordination/alerts"));
+  }
+
+  /**
+   * Create a coordination alert rule. Returns the rule plus a one-time
+   * `webhook_secret` (save it — used for HMAC-SHA256 signature verification).
+   * Tier quotas: PRO 5 rules, ULTRA 20 rules.
+   */
+  create(params: CoordinationAlertCreateParams): Promise<CoordinationAlertCreateResponse> {
+    return this._post(buildUrl(this._baseUrl, "/kol/coordination/alerts"), params);
+  }
+
+  /** Fetch a single rule by id. */
+  get(id: string): Promise<CoordinationAlertGetResponse> {
+    return this._get(buildUrl(this._baseUrl, `/kol/coordination/alerts/${encodeURIComponent(id)}`));
+  }
+
+  /** Update a rule (toggle is_active, raise min_score, etc). */
+  update(id: string, params: CoordinationAlertUpdateParams): Promise<CoordinationAlertUpdateResponse> {
+    return this._patch(buildUrl(this._baseUrl, `/kol/coordination/alerts/${encodeURIComponent(id)}`), params);
+  }
+
+  /** Delete a rule. */
+  delete(id: string): Promise<CoordinationAlertDeleteResponse> {
+    return this._delete(buildUrl(this._baseUrl, `/kol/coordination/alerts/${encodeURIComponent(id)}`));
+  }
+}
+
 // ─── Tools namespace ─────────────────────────────────────────────────────────
 
 class ToolsClient {
@@ -1449,13 +1604,24 @@ export class MadeOnSol {
   readonly webhooks: WebhookClient;
   /** Wallet tracker: watchlist CRUD, trades, and per-wallet stats. */
   readonly walletTracker: WalletTrackerClient;
+  /** Coordination alert rules CRUD (v1.1) — PRO/ULTRA. */
+  readonly coordinationAlerts: CoordinationAlertsClient;
 
   private readonly _apiKey: string;
   private readonly _baseUrl: string;
 
   constructor(config: MadeOnSolConfig) {
-    if (!config.apiKey || typeof config.apiKey !== "string") {
-      throw new Error("MadeOnSol: apiKey is required. Get a free key at madeonsol.com/developer");
+    if (!config || !config.apiKey || typeof config.apiKey !== "string") {
+      // Print the hint as well — a bare throw can be swallowed by error handlers
+      // and the user never sees the link. console.error guarantees stderr.
+      console.error(
+        "\n[madeonsol] Missing API key.\n" +
+        "  → Get a free key (200 req/day, no card) at https://madeonsol.com/developer\n" +
+        "  → Then: new MadeOnSol({ apiKey: process.env.MADEONSOL_API_KEY })\n",
+      );
+      throw new Error(
+        "MadeOnSol: apiKey is required. Get a free key at https://madeonsol.com/developer",
+      );
     }
     this._apiKey = config.apiKey;
     this._baseUrl = BASE_URL;
@@ -1472,6 +1638,7 @@ export class MadeOnSol {
     this.stream = new StreamClient(boundPost, this._baseUrl);
     this.webhooks = new WebhookClient(boundGet, boundPost, boundPatch, boundDelete, this._baseUrl);
     this.walletTracker = new WalletTrackerClient(boundGet, boundPost, boundPatch, boundDelete, this._baseUrl);
+    this.coordinationAlerts = new CoordinationAlertsClient(boundGet, boundPost, boundPatch, boundDelete, this._baseUrl);
   }
 
   private _headers(): Record<string, string> {

@@ -11,11 +11,23 @@ Official TypeScript/JavaScript SDK for the **[MadeOnSol](https://madeonsol.com) 
 
 > **Build Solana trading bots, analytics dashboards, KOL copy-trading tools, deployer sniper bots, and ecosystem browsers.**
 
+## Quick start (10 seconds)
+
+```bash
+npm install madeonsol
+```
+
+```ts
+import { MadeOnSol } from "madeonsol";
+const client = new MadeOnSol({ apiKey: "msk_..." }); // free key: https://madeonsol.com/developer
+const { trades } = await client.kol.feed({ limit: 5, action: "buy" });
+```
+
 | Feature | Description |
 |---|---|
 | **KOL Tracker** | Real-time trade feed, PnL leaderboard with five time windows (today, 7d, 30d, 90d, 180d), coordination detection, per-wallet profiles, and deep PnL analytics for 1,000+ tracked KOL wallets. **180 days of trade history** retained. |
 | **Alpha Wallet Intel** | Leaderboard of 47,000+ scored early-buyer wallets, full wallet profiles, linked-wallet clustering, token cap-table enrichment, and 0–100 buyer quality scores. |
-| **Wallet Tracker** | Monitor any Solana wallet for swaps and transfers. Track up to 10/50/100 wallets (BASIC/PRO/ULTRA). 120-day event retention. WS events on ULTRA. |
+| **Wallet Tracker** | Monitor any Solana wallet for swaps and transfers. Track up to 10/50/100 wallets (Free/Pro/Ultra). Full wallets, counterparties, and tx_signatures on every tier. 120-day event retention. WS events on ULTRA. |
 | **Deployer Hunter** | Pump.fun deployer scoring, tier leaderboard, deploy alerts, and bonding intelligence |
 | **DEX Trade Stream** | Real-time WebSocket stream of ALL Solana DEX trades — filter by token, wallet, program, or trade size (Ultra) |
 | **Webhooks** | Push notifications for KOL trades, coordination signals, deployer alerts, and wallet tracker events (Pro/Ultra) |
@@ -130,17 +142,56 @@ Returns: `KolWalletProfile`
 
 #### `client.kol.coordination(params?)`
 
-Detect tokens where multiple KOLs are buying simultaneously — a strong signal of coordinated pumps.
+Detect tokens where multiple KOLs are buying simultaneously — a strong signal of coordinated pumps. **v1.1** adds peak-density windows, exit tracking, and a composite 0–100 coordination score.
 
 ```ts
-const { tokens } = await client.kol.coordination({
-  period: "24h",   // "1h" | "6h" | "24h" | "7d", default "24h"
-  min_kols: 3,     // 2–50, default 3
-  limit: 20,       // 1–50, default 20
+const { coordination, score_version, window_minutes } = await client.kol.coordination({
+  period: "24h",           // "1h" | "6h" | "24h" | "7d", default "24h"
+  min_kols: 3,             // 2–50, default 3
+  limit: 20,               // 1–50, default 20
+  window_minutes: 15,      // v1.1 — peak-density window in minutes (1–60)
+  min_score: 60,           // v1.1 — filter by composite score (0–100)
+  include_majors: false,   // v1.1 — include WIF/BONK/POPCAT
 });
+
+for (const c of coordination) {
+  console.log(c.token_symbol, "score", c.coordination_score, "peak", c.peak_kols, "exited", c.exited_count);
+  // c.kols[]: { name, wallet, buy_sol, sell_sol, exited }
+}
 ```
 
-Returns: `KolCoordinationResponse`
+Returns: `KolCoordinationResponse` — `{ coordination: CoordinatedToken[], score_version, window_minutes }`
+
+---
+
+#### `client.coordinationAlerts.*` (v1.1)
+
+Create **real-time push alerts** that fire the moment a new coordination cluster forms. Alerts are evaluated per-trade by the signal-evaluator service (sub-second latency), delivered via WebSocket channel `kol:coordination` and/or HMAC-signed webhook. **PRO: 5 rules, ULTRA: 20 rules.**
+
+```ts
+// Create a rule: ≥5 KOLs, 10-min window, score ≥70, webhook delivery
+const { rule, webhook_secret } = await client.coordinationAlerts.create({
+  name: "strong-clusters",
+  min_kols: 5,
+  window_minutes: 10,
+  min_score: 70,
+  include_majors: false,
+  cooldown_min: 30,           // don't re-fire same token within 30 min
+  score_jump_break: 15,       // UNLESS score jumps by 15+ (catches conviction surges)
+  delivery_mode: "webhook",   // "websocket" | "webhook" | "both"
+  webhook_url: "https://example.com/coord-hook",
+});
+// SAVE webhook_secret — used for HMAC-SHA256 signature verification.
+
+await client.coordinationAlerts.list();
+await client.coordinationAlerts.get(rule.id);
+await client.coordinationAlerts.update(rule.id, { min_score: 80, is_active: false });
+await client.coordinationAlerts.delete(rule.id);
+```
+
+Webhook signatures: header `X-MadeOnSol-Signature` = `sha256(timestamp + "." + body)` with `webhook_secret` as the HMAC key. Reject deliveries older than ~5 min.
+
+WebSocket delivery: subscribe to channel `kol:coordination` on `wss://madeonsol.com/ws/v1/stream` — events are user-scoped (you only receive your own rule fires).
 
 ---
 
@@ -164,9 +215,8 @@ Deep per-wallet PnL breakdown with equity curve, risk metrics, and position hist
 const pnl = await client.kol.pnl("7xKX...", {
   period: "30d", // "7d" | "30d" | "90d" | "180d", default "30d"
 });
-// BASIC: summary stats only
-// PRO: + equity curve + closed positions
-// ULTRA: + open positions
+// All tiers: summary + equity curve + closed positions
+// ULTRA: + open positions (tokens bought but not yet sold)
 ```
 
 Returns: `KolPnlResponse`
@@ -183,7 +233,7 @@ const { tokens } = await client.kol.trendingTokens({
   min_kols: 2,     // minimum distinct KOL buyers
   limit: 20,       // 1–50, default 20
 });
-// Sub-hour periods (5m, 15m, 30m) require PRO or ULTRA
+// Available on all tiers; ULTRA unlocks full KOL wallet addresses per token
 ```
 
 Returns: `KolTrendingTokensResponse`
@@ -203,7 +253,7 @@ const { wallets } = await client.alpha.leaderboard({
   min_tokens: 5,
   exclude_bots: true,
 });
-// BASIC: 25 results, PRO: 100, ULTRA: 500
+// Up to 100 results on Free/Pro; ULTRA unlocks 500 + bot signals
 ```
 
 Returns: `AlphaLeaderboardResponse`
@@ -266,7 +316,7 @@ List your tracked wallets and remaining capacity.
 
 ```ts
 const { wallets, capacity } = await client.walletTracker.watchlist();
-// capacity: { used, limit } — BASIC: 10, PRO: 50, ULTRA: 100
+// capacity: { used, limit } — Free: 10, Pro: 50, Ultra: 100
 ```
 
 Returns: `WatchlistResponse`
@@ -404,7 +454,7 @@ Real-time deploy alerts — fired when a tracked deployer launches a new token.
 const { alerts } = await client.deployer.alerts({
   since: "2025-01-01T00:00:00Z", // ISO 8601
   limit: 20,
-  tier: "elite", // "elite" | "good" | "moderate" | "rising" | "cold" — PRO/ULTRA only
+  tier: "elite", // "elite" | "good" | "moderate" | "rising" | "cold"
   offset: 0,
 });
 ```
