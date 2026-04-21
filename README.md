@@ -778,6 +778,7 @@ import type {
 
 | Platform | Package |
 |---|---|
+| Rust | [`madeonsol`](https://crates.io/crates/madeonsol) on crates.io |
 | Python (LangChain, CrewAI) | [`madeonsol-x402`](https://pypi.org/project/madeonsol-x402/) on PyPI |
 | MCP Server (Claude, Cursor) | [`mcp-server-madeonsol`](https://www.npmjs.com/package/mcp-server-madeonsol) |
 | ElizaOS | [`@madeonsol/plugin-madeonsol`](https://www.npmjs.com/package/@madeonsol/plugin-madeonsol) |
