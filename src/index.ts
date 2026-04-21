@@ -99,39 +99,71 @@ export interface KolCoordinationParams {
   min_score?: number;
 }
 
-export interface KolTrade {
-  signature: string;
+export interface KolTradeDeployer {
   wallet: string;
-  kol_name: string | null;
-  kol_twitter: string | null;
+  tier: string;
+  bonding_rate?: number | null;
+}
+
+export interface KolTrade {
+  tx_signature: string;
+  wallet_address: string;
+  kol_name?: string | null;
+  kol_twitter?: string | null;
   action: KolAction;
-  mint: string;
-  token_name: string | null;
-  token_symbol: string | null;
+  token_mint: string;
+  token_name?: string | null;
+  token_symbol?: string | null;
   sol_amount: number;
   token_amount: number;
-  price_usd: number | null;
-  timestamp: string;
+  traded_at: string;
+  kol_strategy_tag?: string | null;
+  kol_auto_strategy_tag?: string | null;
+  kol_winrate_7d?: number | null;
+  kol_winrate_30d?: number | null;
+  kol_early_entry_pct_30d?: number | null;
+  kol_is_heating_up?: boolean | null;
+  kol_percentile_pnl_7d?: number | null;
+  kol_percentile_winrate_7d?: number | null;
+  token_age_minutes?: number | null;
+  deployer?: KolTradeDeployer | null;
+  deployer_tier?: string | null;
 }
 
 export interface KolFeedResponse {
   trades: KolTrade[];
   count: number;
+  data_age_seconds?: number | null;
+  _rid?: string;
 }
 
 export interface KolLeaderboardEntry {
+  name?: string | null;
   wallet: string;
-  kol_name: string | null;
-  kol_twitter: string | null;
-  total_pnl_usd: number;
-  win_rate: number;
-  trade_count: number;
-  rank: number;
+  strategy_tag?: string | null;
+  auto_strategy_tag?: string | null;
+  pnl: number;
+  buy_count: number;
+  sell_count: number;
+  volume: number;
+  win_rate?: number | null;
+  avg_roi?: number | null;
+  profit_factor?: number | null;
+  early_entry_pct_30d?: number | null;
+  consistency_7d?: number | null;
+  is_heating_up?: boolean | null;
+  is_cold?: boolean | null;
+  percentile_pnl_7d?: number | null;
+  percentile_winrate_7d?: number | null;
+  percentile_pnl_30d?: number | null;
+  percentile_winrate_30d?: number | null;
 }
 
 export interface KolLeaderboardResponse {
   leaderboard: KolLeaderboardEntry[];
-  period: LeaderboardPeriod;
+  period: string;
+  sort?: string | null;
+  _rid?: string;
 }
 
 export interface KolPnlByToken {
@@ -198,6 +230,9 @@ export interface KolCoordinationResponse {
   score_version?: string;
   /** v1.1 — Peak-density window used for this response. */
   window_minutes?: number;
+  period?: string;
+  min_kols?: number;
+  _rid?: string;
 }
 
 // ─── Coordination alerts (v1.1) ─────────────────────────────────────────────
@@ -254,6 +289,7 @@ export interface CoordinationAlertUpdateParams {
 
 export interface CoordinationAlertListResponse {
   rules: CoordinationAlertRule[];
+  _rid?: string;
 }
 
 export interface CoordinationAlertCreateResponse {
@@ -272,7 +308,7 @@ export interface CoordinationAlertUpdateResponse {
 }
 
 export interface CoordinationAlertDeleteResponse {
-  deleted: true;
+  deleted: boolean;
 }
 
 export type KolPairsPeriod = "7d" | "30d";
@@ -300,8 +336,9 @@ export interface KolPair {
 
 export interface KolPairsResponse {
   pairs: KolPair[];
-  period: KolPairsPeriod;
+  period: string;
   min_shared: number;
+  _rid?: string;
 }
 
 export interface KolTimingParams {
@@ -326,7 +363,7 @@ export interface KolTimingProfile {
 export interface KolTimingResponse {
   kol: { name: string; wallet?: string };
   timing: KolTimingProfile;
-  period: KolTimingPeriod;
+  period: string;
 }
 
 export interface KolHotTokensParams {
@@ -353,13 +390,22 @@ export interface HotToken {
   total_sell_sol: number;
   net_flow: number;
   first_kol_buy_age_minutes: number | null;
-  kols?: { name: string; wallet?: string }[];
+  kols?: { name: string; wallet?: string }[] | null;
+  token_image_url?: string | null;
+  first_kol_buy_at?: string | null;
+  last_kol_buy_at?: string | null;
+  time_to_consensus_sec?: number | null;
+  avg_winrate_7d?: number | null;
+  entry_rank_avg?: number | null;
+  unique_strategies?: number | null;
+  strategies?: string[] | null;
 }
 
 export interface KolHotTokensResponse {
   hot_tokens: HotToken[];
-  period: KolHotTokensPeriod;
+  period: string;
   min_kols: number;
+  _rid?: string;
 }
 
 export interface KolPnlParams {
@@ -418,12 +464,12 @@ export interface KolOpenPosition {
 }
 
 export interface KolPnlResponse {
-  kol: { name: string; wallet?: string; twitter_url?: string; strategy_tag?: string };
+  kol: { name: string; wallet?: string | null; twitter_url?: string | null; strategy_tag?: string | null };
   summary: KolPnlSummary;
-  pnl_curve?: KolPnlCurvePoint[];
-  closed_positions?: KolClosedPosition[];
-  open_positions?: KolOpenPosition[];
-  period: KolPnlPeriod;
+  pnl_curve?: KolPnlCurvePoint[] | null;
+  closed_positions?: KolClosedPosition[] | null;
+  open_positions?: KolOpenPosition[] | null;
+  period: string;
 }
 
 export interface KolTrendingParams {
@@ -454,8 +500,9 @@ export interface TrendingToken {
 
 export interface KolTrendingResponse {
   trending: TrendingToken[];
-  period: KolTrendingPeriod;
+  period: string;
   min_kols: number;
+  _rid?: string;
 }
 
 export interface KolTokenActivity {
@@ -573,10 +620,10 @@ export interface KolAlertsParams {
 }
 
 export interface KolAlert {
-  type: KolAlertType;
-  severity: KolAlertSeverity;
+  type: KolAlertType | string;
+  severity: KolAlertSeverity | string;
   detected_at: string | null;
-  // Shape varies by type — these are common fields.
+  // Shape varies by type — these are common fields flattened from the API response.
   token_mint?: string;
   token_symbol?: string | null;
   token_name?: string | null;
@@ -601,18 +648,21 @@ export interface KolAlert {
   pnl_7d?: number;
   closed_positions_7d?: number;
   percentile_pnl_7d?: number | null;
+  // Any additional fields flattened from the wire payload.
+  [key: string]: unknown;
 }
 
 export interface KolAlertsResponse {
   alerts: KolAlert[];
   count: number;
-  window: KolAlertWindow;
-  types: KolAlertType[];
+  window: string;
+  types: string[];
+  _rid?: string;
 }
 
 // ─── Deployer Hunter types ────────────────────────────────────────────────────
 
-export type DeployerTier = "elite" | "good" | "moderate" | "rising" | "cold";
+export type DeployerTier = "elite" | "good" | "moderate" | "rising" | "cold" | "unranked";
 export type DeployerSortField =
   | "bonding_rate"
   | "recent_bond_rate"
@@ -664,37 +714,57 @@ export interface RecentBondsParams {
   limit?: number;
 }
 
+export interface DeployerTierCounts {
+  elite: number;
+  good: number;
+  rising: number;
+}
+
 export interface DeployerStats {
-  total_deployers: number;
-  elite_count: number;
-  good_count: number;
-  moderate_count: number;
-  rising_count: number;
-  cold_count: number;
-  total_tokens_deployed: number;
-  total_bonded: number;
-  overall_bonding_rate: number;
+  tracked_count: number;
+  signals_today: number;
+  bonds_detected: number;
+  bond_rate: number;
+  tiers: DeployerTierCounts;
+  _rid?: string;
+}
+
+export interface DeployerSummary {
+  wallet_address: string;
+  tier: DeployerTier;
+  bonding_rate?: number | null;
+  total_bonded?: number | null;
+  recent_outcomes?: string | null;
+  recent_bond_rate?: number | null;
+  total_tokens_deployed?: number | null;
 }
 
 export interface DeployerLeaderboardEntry {
-  wallet: string;
+  id: string;
+  wallet_address: string;
   tier: DeployerTier;
   bonding_rate: number;
   recent_bond_rate: number;
-  total_deployed: number;
+  total_tokens_deployed: number;
   total_bonded: number;
-  last_deploy_at: string | null;
+  last_deploy_at?: string | null;
+  recent_outcomes?: string | null;
+  avg_time_to_bond_minutes?: number | null;
+  best_token_peak_mc?: number | null;
+  avg_peak_mc?: number | null;
+  last_bond_at?: string | null;
+  is_tracked?: boolean | null;
+  label?: string | null;
+  first_seen_at?: string | null;
 }
 
 export interface DeployerLeaderboardResponse {
   deployers: DeployerLeaderboardEntry[];
-  count: number;
   total: number;
-}
-
-export interface DeployerProfile extends DeployerLeaderboardEntry {
-  first_seen: string | null;
-  tokens?: DeployerToken[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  _rid?: string;
 }
 
 export interface DeployerToken {
@@ -707,76 +777,153 @@ export interface DeployerToken {
   peak_market_cap_usd: number | null;
 }
 
+export interface DeployerProfile {
+  wallet: string;
+  tier: DeployerTier;
+  bonding_rate: number;
+  recent_bond_rate: number;
+  total_deployed: number;
+  total_bonded: number;
+  last_deploy_at: string | null;
+  first_seen: string | null;
+  tokens?: DeployerToken[] | null;
+}
+
 export interface DeployerTokensResponse {
   tokens: DeployerToken[];
   count: number;
   total: number;
 }
 
+export interface KolBuysSummary {
+  count: number;
+  total_sol: number;
+  kols: unknown[];
+}
+
 export interface DeployerAlert {
   id: string;
-  wallet: string;
-  tier: DeployerTier;
-  mint: string;
-  token_name: string | null;
-  token_symbol: string | null;
-  deployed_at: string;
-  bonding_rate_at_deploy: number;
+  token_mint: string;
+  token_name?: string | null;
+  token_symbol?: string | null;
+  alert_type: string;
+  title: string;
+  message: string;
+  priority: string;
+  created_at: string;
+  market_cap_at_alert?: number | null;
+  deployers: DeployerSummary;
+  kol_buys?: KolBuysSummary | null;
 }
 
 export interface DeployerAlertsResponse {
   alerts: DeployerAlert[];
-  count: number;
+  limit: number;
+  offset: number;
+  data_age_seconds?: number | null;
+  _rid?: string;
+}
+
+export interface BondRateStats {
+  total_deploys: number;
+  total_bonded: number;
+  rate: number;
+}
+
+export interface MultiplierStats {
+  total_with_mc: number;
+  pct_2x: number;
+  pct_5x: number;
+  pct_10x: number;
+  pct_50x: number;
+  avg_multiplier: number;
+  best_multiplier: number;
+}
+
+export interface TierStats {
+  deploys: number;
+  bonded: number;
+  bond_rate: number;
+  avg_multiplier?: number | null;
+  total_with_mc: number;
 }
 
 export interface DeployerAlertStats {
-  period: AlertPeriod;
-  total_alerts: number;
-  by_tier: Record<DeployerTier, number>;
-  bonded_count: number;
-  bonding_rate: number;
+  bond_rate: BondRateStats;
+  multiplier: MultiplierStats;
+  tiers: Record<string, TierStats>;
+  period: string;
+  _rid?: string;
 }
 
 export interface BestToken {
-  mint: string;
-  name: string | null;
-  symbol: string | null;
+  id: string;
+  token_mint: string;
+  token_name?: string | null;
+  token_symbol?: string | null;
+  token_image_url?: string | null;
+  bonded_at: string;
+  peak_market_cap?: number | null;
+  mc_at_bond?: number | null;
+  market_cap_at_alert?: number | null;
+  mc_multiplier?: number | null;
   deployer_wallet: string;
   deployer_tier: DeployerTier;
-  peak_market_cap_usd: number | null;
-  bonded_at: string | null;
+  alerted_at?: string | null;
 }
 
 export interface BestTokensResponse {
   tokens: BestToken[];
-  period: BestTokensPeriod;
+  period: string;
+  limit: number;
+  _rid?: string;
 }
 
 export interface RecentBond {
-  mint: string;
-  name: string | null;
-  symbol: string | null;
-  deployer_wallet: string;
-  deployer_tier: DeployerTier;
+  id: string;
+  token_mint: string;
+  token_name?: string | null;
+  token_symbol?: string | null;
+  deployed_at: string;
   bonded_at: string;
-  peak_market_cap_usd: number | null;
+  time_to_bond_minutes?: number | null;
+  peak_market_cap?: number | null;
+  mc_at_bond?: number | null;
+  deployers: DeployerSummary;
 }
 
 export interface RecentBondsResponse {
-  bonds: RecentBond[];
+  tokens: RecentBond[];
+  limit: number;
+  _rid?: string;
+}
+
+export interface DeployerStreak {
+  type: string;
   count: number;
 }
 
+export interface DeployerRollingRate {
+  window_end: number;
+  bond_rate: number;
+}
+
+export interface DeployerStretch {
+  start_index: number;
+  end_index: number;
+  bond_rate: number;
+}
+
 export interface DeployerTrajectoryData {
-  current_streak: { type: "bond" | "fail" | "none"; count: number };
+  current_streak: DeployerStreak;
   longest_bond_streak: number;
   longest_fail_streak: number;
-  rolling_bond_rates: { window_end: number; bond_rate: number }[];
-  trend: "improving" | "declining" | "stable";
+  rolling_bond_rates: DeployerRollingRate[];
+  trend: string;
   avg_days_between_deploys: number | null;
   avg_recovery_tokens: number | null;
-  best_stretch: { start_index: number; end_index: number; bond_rate: number } | null;
-  worst_stretch: { start_index: number; end_index: number; bond_rate: number } | null;
+  best_stretch: DeployerStretch | null;
+  worst_stretch: DeployerStretch | null;
   total_tokens_analyzed: number;
 }
 
@@ -836,10 +983,11 @@ export interface AlphaWalletEntry {
 export interface AlphaLeaderboardResponse {
   leaderboard: AlphaWalletEntry[];
   total: number;
-  period: AlphaPeriod;
-  sort: AlphaSort;
+  period: string;
+  sort: string;
   min_tokens: number;
   exclude_bots: boolean;
+  _rid?: string;
 }
 
 export interface AlphaWalletPosition {
@@ -862,24 +1010,26 @@ export interface AlphaWalletBotSignal {
   detail: string;
 }
 
+export interface AlphaWalletSummary {
+  tokens_traded: number;
+  wins: number;
+  losses: number;
+  win_rate: number | null;
+  net_pnl_sol: number;
+  total_vol_sol: number;
+  roi: number | null;
+  avg_rank: number | null;
+  best_rank: number | null;
+  bundle_rate: number;
+  buy_size_stddev: number;
+  active_hours: number | null;
+  bot_confidence: string;
+  night_only_activity: boolean;
+}
+
 export interface AlphaWalletResponse {
   wallet: string;
-  summary: {
-    tokens_traded: number;
-    wins: number;
-    losses: number;
-    win_rate: number | null;
-    net_pnl_sol: number;
-    total_vol_sol: number;
-    roi: number | null;
-    avg_rank: number | null;
-    best_rank: number | null;
-    bundle_rate: number;
-    buy_size_stddev: number;
-    active_hours: number | null;
-    bot_confidence: string;
-    night_only_activity: boolean;
-  };
+  summary: AlphaWalletSummary;
   positions: AlphaWalletPosition[];
   bot_signals: AlphaWalletBotSignal[];
 }
@@ -968,11 +1118,19 @@ export interface WalletEntry {
   added_at: string;
 }
 
+export interface WatchlistAddResponse {
+  wallet_address: string;
+  label: string | null;
+  added_at: string;
+  remaining: number;
+}
+
 export interface WatchlistResponse {
   wallets: WalletEntry[];
   count: number;
   limit: number;
   remaining: number;
+  _rid?: string;
 }
 
 export interface WalletTrackerEvent {
@@ -1035,7 +1193,11 @@ export interface WalletTrackerSummaryParams {
 
 export interface WalletTrackerSummaryResponse {
   wallets: WalletTrackerWalletStats[];
-  period: WalletTrackerSummaryPeriod;
+  period: string;
+}
+
+export interface WalletTrackerDeleteResponse {
+  success: boolean;
 }
 
 // ─── Tools types ─────────────────────────────────────────────────────────────
@@ -1050,22 +1212,23 @@ export interface ToolsSearchParams {
 }
 
 export interface Tool {
-  id: string;
   name: string;
   slug: string;
   tagline: string;
-  description: string;
   website_url: string;
-  logo_url: string | null;
+  logo_url?: string | null;
   categories: string[];
-  pricing_model: string | null;
-  upvote_count: number;
-  twitter_url: string | null;
+  pricing_model?: string | null;
+  average_rating?: number | null;
+  review_count?: number | null;
+  health_score?: number | null;
+  url?: string | null;
 }
 
 export interface ToolsSearchResponse {
   tools: Tool[];
   count: number;
+  _rid?: string;
 }
 
 // ─── Streaming types ────────────────────────────────────────────────────────
@@ -1073,10 +1236,12 @@ export interface ToolsSearchResponse {
 export interface StreamToken {
   token: string;
   expires_at: string;
+  next_refresh_at?: string | null;
   ws_url: string;
   /** DEX trade stream URL — only present for Ultra tier subscribers */
-  dex_ws_url?: string;
+  dex_ws_url?: string | null;
   usage: string;
+  _rid?: string;
 }
 
 // ─── Webhook types ──────────────────────────────────────────────────────────
@@ -1105,7 +1270,11 @@ export interface Webhook {
 
 export interface WebhookListResponse {
   webhooks: Webhook[];
-  count: number;
+  _rid?: string;
+}
+
+export interface WebhookDeleteResponse {
+  success: boolean;
 }
 
 // ─── Client config ────────────────────────────────────────────────────────────
@@ -1421,7 +1590,7 @@ class WalletTrackerClient {
    * Limits: BASIC=10, PRO=50, ULTRA=100.
    * @param params wallet_address (required), label (optional).
    */
-  addToWatchlist(params: WatchlistAddParams): Promise<WalletEntry & { remaining: number }> {
+  addToWatchlist(params: WatchlistAddParams): Promise<WatchlistAddResponse> {
     return this._post(buildUrl(this._baseUrl, "/wallet-tracker/watchlist"), params);
   }
 
@@ -1429,7 +1598,7 @@ class WalletTrackerClient {
    * Remove a wallet from your watchlist.
    * @param address Solana wallet address to remove.
    */
-  removeFromWatchlist(address: string): Promise<{ success: boolean }> {
+  removeFromWatchlist(address: string): Promise<WalletTrackerDeleteResponse> {
     return this._delete(buildUrl(this._baseUrl, `/wallet-tracker/watchlist/${encodeURIComponent(address)}`));
   }
 
@@ -1560,7 +1729,7 @@ class WebhookClient {
   }
 
   /** Delete a webhook. */
-  delete(id: number): Promise<{ success: boolean }> {
+  delete(id: number): Promise<WebhookDeleteResponse> {
     return this._delete(buildUrl(this._baseUrl, `/webhooks/${id}`));
   }
 
@@ -1669,13 +1838,13 @@ export class MadeOnSol {
     }
 
     if (!response.ok) {
-      const message =
-        typeof responseBody === "object" &&
-        responseBody !== null &&
-        "message" in responseBody &&
-        typeof (responseBody as Record<string, unknown>).message === "string"
-          ? (responseBody as Record<string, string>).message
-          : `Request failed with status ${response.status}`;
+      const body =
+        typeof responseBody === "object" && responseBody !== null
+          ? (responseBody as Record<string, unknown>)
+          : null;
+      const errField = body && typeof body.error === "string" ? body.error : null;
+      const msgField = body && typeof body.message === "string" ? body.message : null;
+      const message = errField ?? msgField ?? `Request failed with status ${response.status}`;
       throw new MadeOnSolError(message, response.status, responseBody);
     }
 
