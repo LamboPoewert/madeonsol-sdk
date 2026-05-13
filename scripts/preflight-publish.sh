@@ -54,7 +54,11 @@ if [ -n "$DIRTY" ]; then
 fi
 
 # ── 2. Tag exists for this version ──────────────────────────────────────────
-if [ "$PKG_DIR" = "$GIT_ROOT" ]; then
+# Use --show-prefix (relative path from repo root to cwd) for portable
+# at-root detection — comparing $PKG_DIR to $GIT_ROOT directly breaks on
+# Git Bash for Windows where pwd returns /c/... but rev-parse returns C:/...
+PREFIX=$(git rev-parse --show-prefix)
+if [ -z "$PREFIX" ]; then
   TAG="v${VERSION}"
 else
   LEAF=$(basename "$PKG_DIR")
