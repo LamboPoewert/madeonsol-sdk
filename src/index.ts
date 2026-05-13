@@ -62,6 +62,10 @@ export interface KolFeedParams {
   min_kol_winrate?: number;
   /** Filter by auto-classified strategy tag. */
   strategy?: KolStrategy;
+  /** v1.6 — Lower bound on market_cap_usd_at_trade. Trades with unknown MC are dropped when this is set. */
+  min_mc_usd?: number;
+  /** v1.6 — Upper bound on market_cap_usd_at_trade. */
+  max_mc_usd?: number;
 }
 
 export interface KolLeaderboardParams {
@@ -99,6 +103,10 @@ export interface KolCoordinationParams {
   window_minutes?: number;
   /** v1.1 — Minimum composite coordination score (0–100). Default: 0. */
   min_score?: number;
+  /** v1.6 — Lower bound on the cluster's entry MC (MC at the chronologically-first KOL buy). Tokens with unknown entry MC are dropped when this is set. */
+  min_mc_usd?: number;
+  /** v1.6 — Upper bound on the cluster's entry MC. */
+  max_mc_usd?: number;
 }
 
 export interface KolTradeDeployer {
@@ -167,10 +175,6 @@ export interface KolLeaderboardEntry {
   percentile_winrate_7d?: number | null;
   percentile_pnl_30d?: number | null;
   percentile_winrate_30d?: number | null;
-  /** v2.4 (2026-05-06) — average market cap (USD) at the moment of each buy in the period. Null when no buys had a tracked MC stamp. */
-  avg_entry_mc_usd?: number | null;
-  /** v2.4 — buys whose market_cap_usd_at_trade was non-null and counted toward avg_entry_mc_usd. Use to gauge confidence. */
-  entry_mc_samples?: number;
 }
 
 export interface KolLeaderboardResponse {
@@ -270,6 +274,10 @@ export interface CoordinationAlertRule {
   score_jump_break: number;
   delivery_mode: CoordinationDeliveryMode;
   webhook_url: string | null;
+  /** v1.6 — Lower bound on entry MC (MC at the triggering trade). Tokens with unknown MC are dropped when set. */
+  min_mc_usd?: number | null;
+  /** v1.6 — Upper bound on entry MC. */
+  max_mc_usd?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -292,6 +300,10 @@ export interface CoordinationAlertCreateParams {
   delivery_mode?: CoordinationDeliveryMode;
   /** Required when delivery_mode is "webhook" or "both". Must be HTTPS. */
   webhook_url?: string;
+  /** v1.6 — Lower bound on entry MC. Drops triggers on tokens whose MC at the triggering trade is below this. */
+  min_mc_usd?: number;
+  /** v1.6 — Upper bound on entry MC. Drops triggers on tokens above this MC. */
+  max_mc_usd?: number;
 }
 
 export interface CoordinationAlertUpdateParams {
@@ -305,6 +317,10 @@ export interface CoordinationAlertUpdateParams {
   delivery_mode?: CoordinationDeliveryMode;
   webhook_url?: string | null;
   is_active?: boolean;
+  /** v1.6 — Pass null to clear; omit to leave unchanged. */
+  min_mc_usd?: number | null;
+  /** v1.6 — Pass null to clear; omit to leave unchanged. */
+  max_mc_usd?: number | null;
 }
 
 export interface CoordinationAlertListResponse {
@@ -346,6 +362,10 @@ export interface FirstTouchesParams {
   kol?: string;
   /** 0–100. */
   min_kol_winrate_7d?: number;
+  /** v1.6 — Lower bound on market_cap_usd_at_first_buy. Touches with unknown MC are dropped when this is set. */
+  min_mc_usd?: number;
+  /** v1.6 — Upper bound on market_cap_usd_at_first_buy. */
+  max_mc_usd?: number;
   /** Restrict to scouts of this tier or better (S > A > B > C). Requires n_first_touches_30d ≥ 30. */
   min_scout_tier?: ScoutTier;
   /** Lower the minimum sample size for scout scoring (default 30). */
@@ -416,6 +436,10 @@ export interface FirstTouchSubscription {
   filters: FirstTouchSubscriptionFilters;
   delivery_mode: CoordinationDeliveryMode;
   webhook_url: string | null;
+  /** v1.6 — Lower bound on first-touch MC. Pass null to clear. */
+  min_mc_usd?: number | null;
+  /** v1.6 — Upper bound on first-touch MC. Pass null to clear. */
+  max_mc_usd?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -428,6 +452,10 @@ export interface FirstTouchSubscriptionCreateParams {
   delivery_mode?: CoordinationDeliveryMode;
   /** Required when delivery_mode is "webhook" or "both". Must be HTTPS. */
   webhook_url?: string;
+  /** v1.6 — Lower bound on first-touch MC. */
+  min_mc_usd?: number;
+  /** v1.6 — Upper bound on first-touch MC. */
+  max_mc_usd?: number;
 }
 
 export interface FirstTouchSubscriptionUpdateParams {
@@ -436,6 +464,10 @@ export interface FirstTouchSubscriptionUpdateParams {
   delivery_mode?: CoordinationDeliveryMode;
   webhook_url?: string | null;
   is_active?: boolean;
+  /** v1.6 — Pass null to clear; omit to leave unchanged. */
+  min_mc_usd?: number | null;
+  /** v1.6 — Pass null to clear; omit to leave unchanged. */
+  max_mc_usd?: number | null;
 }
 
 export interface FirstTouchSubscriptionListResponse {
@@ -1150,9 +1182,6 @@ export interface AlphaWalletEntry {
   buy_size_stddev?: number;
   active_hours?: number | null;
   bot_confidence?: string | null;
-  /** v2.4 (2026-05-06) — avg market cap (USD) at the moment of each buy in the period. Null + 0 samples for non-KOL wallets. */
-  avg_entry_mc_usd?: number | null;
-  entry_mc_samples?: number;
 }
 
 export interface AlphaLeaderboardResponse {
@@ -1305,6 +1334,19 @@ export interface TokenDeployerInfo {
   recent_bond_rate: number | null;
 }
 
+/**
+ * Velocity windows surfaced by the API. Each metric is its own object keyed
+ * by window label; window keys are sparse — only present once the token has
+ * been tracked long enough for that window to be computed. Use the parent's
+ * `history_age_seconds` to know which windows are available.
+ *
+ * Backed by mc-tracker's CONFIRMED-commitment swap stream so windows are
+ * reorg-safe.
+ */
+export type VelocityWindowKey = "5m" | "15m" | "1h" | "2h" | "4h";
+export type VelocityNumberMap = Partial<Record<VelocityWindowKey, number | null>>;
+export type VelocityVolumeMap = Partial<Record<VelocityWindowKey, number>>;
+
 export interface TokenResponseBody {
   mint: string;
   price_usd: number | null;
@@ -1323,6 +1365,14 @@ export interface TokenResponseBody {
   blacklist_category?: string | null;
   deployer: TokenDeployerInfo | null;
   kol_activity: TokenKolActivity;
+  /** v1.7 — market-cap % change keyed by window (sparse — only windows the token has enough history for). */
+  mc_change_pct?: VelocityNumberMap;
+  /** v1.7 — organic (MEV-stripped) USD volume keyed by window. */
+  volume_usd?: VelocityVolumeMap;
+  /** v1.7 — MEV/bot volume as % of total volume keyed by window. */
+  mev_volume_pct?: VelocityNumberMap;
+  /** v1.7 — seconds of velocity history available for this token (capped at ~4h05m). */
+  history_age_seconds?: number | null;
 }
 
 export interface TokenResponse {
@@ -1333,6 +1383,118 @@ export interface TokenResponse {
 export interface TokenBatchResponse {
   tokens: TokenResponseBody[];
   count: number;
+  _rid?: string;
+}
+
+// ─── /tokens (directory list) types — v1.7 ───────────────────────────────────
+
+export type TokenListSort =
+  | "mc_desc"
+  | "mc_asc"
+  | "last_trade_desc"
+  | "liquidity_desc"
+  | "cumulative_volume_desc";
+
+export type TokenPrimaryDex =
+  | "pumpfun"
+  | "pumpswap"
+  | "raydium"
+  | "meteora"
+  | "orca"
+  | "raydium_clmm";
+
+export interface TokenListParams {
+  // MC band
+  min_mc?: number;
+  max_mc?: number;
+  /** Minimum liquidity_usd. Default 2000 — pass 0 to disable. */
+  min_liq?: number;
+  /** Only tokens with a trade within the last N hours (0.1–168). */
+  active_h?: number;
+  primary_dex?: TokenPrimaryDex;
+  authority_revoked?: boolean;
+  exclude_token2022?: boolean;
+  min_lp_burnt_pct?: number;
+  /** Computed (post-filter): organic-volume floor in the last 1 hour. */
+  min_volume_1h_usd?: number;
+  /** Computed (post-filter): MEV/bot volume ceiling as a % of total. */
+  max_mev_share_pct?: number;
+  /** Computed (post-filter): minimum 1h MC change %. */
+  mc_change_1h_min_pct?: number;
+  /** Computed (post-filter): maximum 1h MC change %. */
+  mc_change_1h_max_pct?: number;
+  sort?: TokenListSort;
+  limit?: number;
+  offset?: number;
+}
+
+export interface TokenSummary {
+  mint: string;
+  symbol: string | null;
+  name: string | null;
+  price_usd: number | null;
+  market_cap_usd: number | null;
+  fdv_usd: number | null;
+  liquidity_usd: number | null;
+  primary_dex: string | null;
+  authorities_revoked: boolean;
+  lp_burnt_pct: number | null;
+  is_token_2022: boolean;
+  last_trade_time: string | null;
+  mc_change_5m_pct: number | null;
+  mc_change_1h_pct: number | null;
+  organic_volume_1h_usd: number | null;
+  mev_share_pct: number | null;
+}
+
+export interface TokenListResponse {
+  tokens: TokenSummary[];
+  pagination: {
+    limit: number;
+    offset: number;
+    returned: number;
+    has_more: boolean;
+    /** True when at least one computed filter ran in JS — page size may be < limit. */
+    post_filtered: boolean;
+  };
+  filters: Record<string, unknown>;
+  _rid?: string;
+}
+
+// ─── /me types — v1.7 ────────────────────────────────────────────────────────
+
+export type ApiTier = "BASIC" | "TRADER" | "PRO" | "ULTRA";
+
+export interface MeQuotaWindow {
+  limit: number;
+  used: number;
+  remaining: number;
+}
+
+export interface MeResponse {
+  subscriber: string;
+  tier: ApiTier;
+  tier_label: string;
+  subscription: {
+    status: string;
+    billing_cycle: "monthly" | "annual";
+    current_period_end: string | null;
+    started_at: string;
+  } | null;
+  quota: {
+    daily: MeQuotaWindow & { resets_at: string };
+    burst: MeQuotaWindow & { window_seconds: number };
+  };
+  features: {
+    webhooks: { limit: number; used: number };
+    ws_connections: { limit: number };
+    dex_connections: { limit: number };
+    copytrade_wallets: { limit: number; used: number };
+    copytrade_rules: { limit: number; used: number };
+    coordination_rules: { limit: number; used: number };
+    first_touch_subscriptions: { limit: number; used: number };
+    wallet_tracker_watchlist: { used: number };
+  };
   _rid?: string;
 }
 
@@ -1777,6 +1939,29 @@ class TokenClient {
   batchBuyerQuality(mints: string[]): Promise<AlphaBuyerQualityBatchResponse> {
     return this._post(`${this._baseUrl}/tokens/batch/buyer-quality`, { mints });
   }
+
+  /**
+   * v1.7 — Filtered, sortable token directory. **PRO+** only. Default
+   * `min_liq=2000` trims the long tail of phantom-MC tokens (low-liq pools
+   * producing absurd VWAP × supply products); pass `min_liq=0` to opt out.
+   * Computed filters (`min_volume_1h_usd`, `max_mev_share_pct`, `mc_change_1h_*`)
+   * over-fetch 3× from the DB and filter in JS — pagination page size may be
+   * smaller than `limit` when these are set. The response includes
+   * `pagination.post_filtered` so clients can detect the over-fetch behaviour.
+   * @example
+   * ```ts
+   * const { tokens } = await client.token.list({
+   *   min_liq: 10000,
+   *   min_volume_1h_usd: 5000,
+   *   max_mev_share_pct: 60,
+   *   sort: "mc_desc",
+   *   limit: 50,
+   * });
+   * ```
+   */
+  list(params?: TokenListParams): Promise<TokenListResponse> {
+    return this._fetch(buildUrl(this._baseUrl, "/tokens", params as Record<string, string | number | boolean | undefined>));
+  }
 }
 
 // ─── Deployer namespace ───────────────────────────────────────────────────────
@@ -2160,6 +2345,25 @@ export class MadeOnSol {
 
   private _headers(): Record<string, string> {
     return { Authorization: `Bearer ${this._apiKey}`, Accept: "application/json" };
+  }
+
+  /**
+   * v1.7 — Inspect your own quota, tier, and feature usage. Reads from the
+   * same in-memory counters that drive rate-limit enforcement, so the
+   * `quota.daily.remaining` returned here is authoritative (no header parsing).
+   * Available to every authenticated tier.
+   *
+   * @example
+   * ```ts
+   * const me = await client.me();
+   * console.log(`${me.tier}: ${me.quota.daily.remaining}/${me.quota.daily.limit} req left today`);
+   * if (me.quota.daily.remaining < 100) {
+   *   // self-throttle
+   * }
+   * ```
+   */
+  me(): Promise<MeResponse> {
+    return this._request(buildUrl(this._baseUrl, "/me"));
   }
 
   private async _request<T>(url: string): Promise<T> {
